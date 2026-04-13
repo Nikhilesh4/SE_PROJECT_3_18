@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # Jooble API
     JOOBLE_API_KEY: str = os.getenv("JOOBLE_API_KEY", "")
 
+    # RSS Refresh
+    RSS_REFRESH_ENABLED: bool = True
+    RSS_DEFAULT_TTL_MINUTES: int = 60
+
     class Config:
         env_file = ".env"
 

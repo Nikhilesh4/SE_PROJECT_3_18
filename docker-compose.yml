@@ -17,5 +17,12 @@ services:
     ports:
       - "6379:6379"
 
+  rss-bridge:
+    image: rssbridge/rss-bridge
+    container_name: unicompass-rss-bridge
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
 volumes:
   pgdata:
