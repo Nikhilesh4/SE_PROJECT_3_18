@@ -2,9 +2,13 @@ import os
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
-load_dotenv()
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load local overrides first, then fallback defaults.
+load_dotenv(BASE_DIR / ".env.local")
+load_dotenv(BASE_DIR / ".env")
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv(
@@ -21,6 +25,13 @@ class Settings(BaseSettings):
 
     # Gemini API
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+
+    # Groq API
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+    # Resume parser provider preference
+    PROFILE_AI_PROVIDER: str = os.getenv("PROFILE_AI_PROVIDER", "groq")
 
     # Adzuna API
     ADZUNA_APP_ID: str = os.getenv("ADZUNA_APP_ID", "")

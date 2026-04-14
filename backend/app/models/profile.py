@@ -20,6 +20,7 @@ class Profile(Base):
     )
     raw_text = Column(Text, nullable=True)
     parsed_skills = Column(ARRAY(String), default=[])
+    parsed_interests = Column(ARRAY(String), default=[])
     parsed_education = Column(Text, nullable=True)
     parsed_experience = Column(Text, nullable=True)
     profile_embedding = (
@@ -28,3 +29,6 @@ class Profile(Base):
         else Column(Text, nullable=True)
     )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
