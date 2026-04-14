@@ -1,1 +1,3 @@
-# Service layer (RSS aggregation, external APIs, etc.)
+from .resume_service import ResumeProfileService
+
+__all__ = ["ResumeProfileService"]
