@@ -9,7 +9,7 @@ The background worker writes through this service after each refresh cycle.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Sequence
 
 import redis
@@ -74,15 +74,19 @@ class RssCacheService:
         category: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        active_only: bool = True,
     ) -> RssAggregationResponse:
         db = SessionLocal()
         try:
             repo = RssItemRepository(db)
-            rows: Sequence[RssItem] = repo.get_items(
-                category=category, limit=limit, offset=offset
-            )
+            # Pull a bounded window from DB, then run active/deadline filtering in memory.
+            # This keeps endpoint responses stable while preserving RSS-source flexibility.
+            rows: Sequence[RssItem] = repo.get_items(category=category, limit=800, offset=0)
+            if active_only:
+                rows = [r for r in rows if self._is_active_item(r)]
+            total = len(rows)
+            rows = rows[offset : offset + limit]
             items = [self._row_to_schema(r) for r in rows]
-            total = repo.count_items(category=category)
 
             return RssAggregationResponse(
                 items=items,
@@ -154,6 +158,7 @@ class RssCacheService:
             url=row.url,
             summary=row.summary or "",
             published_at=row.published_at,
+            application_deadline=row.application_deadline,
             category=row.category,
             source_name=row.source_name,
             feed_url=row.feed_url,
@@ -161,6 +166,28 @@ class RssCacheService:
             author=row.author,
             guid=row.guid,
         )
+
+    @staticmethod
+    def _is_active_item(row: RssItem) -> bool:
+        now = datetime.now(timezone.utc)
+        if row.application_deadline is not None:
+            return RssCacheService._as_utc(row.application_deadline) >= now
+
+        # Per-category freshness cutoffs (no explicit deadline available).
+        # Hackathons go stale quickly; other categories stay longer.
+        cutoff_days = 14 if row.category == "hackathon" else 45
+        recent_cutoff = now - timedelta(days=cutoff_days)
+        if row.published_at is not None:
+            return RssCacheService._as_utc(row.published_at) >= recent_cutoff
+        if row.updated_at is not None:
+            return RssCacheService._as_utc(row.updated_at) >= recent_cutoff
+        return row.created_at is not None and RssCacheService._as_utc(row.created_at) >= recent_cutoff
+
+    @staticmethod
+    def _as_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
 
 
 # Module-level singleton

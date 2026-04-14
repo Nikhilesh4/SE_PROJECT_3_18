@@ -7,6 +7,7 @@ export interface NormalizedRssItem {
     url: string;
     summary: string;
     published_at: string | null;
+    application_deadline?: string | null;
     category: string;
     source_name: string;
     feed_url: string;

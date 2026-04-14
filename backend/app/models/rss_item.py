@@ -15,6 +15,7 @@ class RssItem(Base):
     url = Column(String, nullable=False, index=True)
     summary = Column(Text, nullable=True, default="")
     published_at = Column(DateTime(timezone=True), nullable=True)
+    application_deadline = Column(DateTime(timezone=True), nullable=True, index=True)
     category = Column(String, nullable=False, index=True)
     source_name = Column(String, nullable=False)
     feed_url = Column(String, nullable=False)
