@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping, Protocol
 
 from app.schemas.rss_item import NormalizedRssItem
+from app.services.rss.filter import is_opportunity_post
 
 
 def strip_html(raw: str | None, max_len: int = 2000) -> str:
@@ -28,6 +29,51 @@ def _parse_struct_time(entry: Mapping[str, Any]) -> datetime | None:
             except (TypeError, ValueError):
                 continue
     return None
+
+
+def _try_parse_datetime(raw: str) -> datetime | None:
+    value = raw.strip()
+    formats = (
+        "%B %d %Y",
+        "%B %d, %Y",
+        "%b %d %Y",
+        "%b %d, %Y",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%m/%d/%Y",
+        "%m-%d-%Y",
+        "%d/%m/%y",
+        "%d-%m-%y",
+        "%m/%d/%y",
+        "%m-%d-%y",
+    )
+    for fmt in formats:
+        try:
+            return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _extract_deadline(entry: Mapping[str, Any], summary_text: str) -> datetime | None:
+    # First, honor explicit date-like keys if present in custom feeds.
+    for key in ("application_deadline", "deadline", "apply_by", "closing_date"):
+        val = entry.get(key)
+        if isinstance(val, str):
+            parsed = _try_parse_datetime(val)
+            if parsed is not None:
+                return parsed
+
+    compact = " ".join(summary_text.split())
+    match = re.search(
+        r"(?:deadline|apply by|last date|application closes?)[:\s-]*"
+        r"([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+        compact,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return _try_parse_datetime(match.group(1))
 
 
 def _tags(entry: Mapping[str, Any]) -> list[str]:
@@ -76,11 +122,18 @@ def default_normalize_entry(
         return None
     summary_raw = entry.get("summary") or entry.get("description") or ""
     guid = entry.get("id") or entry.get("guid") or link
+    summary = strip_html(summary_raw)
+
+    # ── Content filter: reject articles / recaps, keep only real openings ──
+    if not is_opportunity_post(title, summary, category):
+        return None
+
     return NormalizedRssItem(
         title=title,
         url=link,
-        summary=strip_html(summary_raw),
+        summary=summary,
         published_at=_parse_struct_time(entry),
+        application_deadline=_extract_deadline(entry, summary),
         category=category,
         source_name=source_name,
         feed_url=feed_url,

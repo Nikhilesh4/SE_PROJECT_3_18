@@ -29,21 +29,26 @@ class RssItemRepository:
         if not items:
             return 0
 
-        rows = [
-            {
-                "guid": item.guid or item.url,
+        # Deduplicate by guid within the batch — PostgreSQL's ON CONFLICT DO UPDATE
+        # raises CardinalityViolation if the same constrained column value appears
+        # more than once in a single INSERT statement.
+        seen: dict[str, dict] = {}
+        for item in items:
+            key = item.guid or item.url
+            seen[key] = {
+                "guid": key,
                 "title": item.title,
                 "url": item.url,
                 "summary": item.summary,
                 "published_at": item.published_at,
+                "application_deadline": item.application_deadline,
                 "category": item.category,
                 "source_name": item.source_name,
                 "feed_url": item.feed_url,
                 "tags": item.tags,
                 "author": item.author,
             }
-            for item in items
-        ]
+        rows = list(seen.values())
 
         stmt = pg_insert(RssItem).values(rows)
         stmt = stmt.on_conflict_do_update(
@@ -52,6 +57,7 @@ class RssItemRepository:
                 "title": stmt.excluded.title,
                 "summary": stmt.excluded.summary,
                 "published_at": stmt.excluded.published_at,
+                "application_deadline": stmt.excluded.application_deadline,
                 "tags": stmt.excluded.tags,
                 "author": stmt.excluded.author,
                 "updated_at": func.now(),

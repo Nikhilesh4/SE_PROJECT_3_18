@@ -23,6 +23,7 @@ class NormalizedRssItem(BaseModel):
     url: str
     summary: str = ""
     published_at: datetime | None = None
+    application_deadline: datetime | None = None
     category: str
     source_name: str
     feed_url: str

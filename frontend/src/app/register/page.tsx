@@ -56,34 +56,34 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 py-12">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
             {/* Background effects */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl" />
-                <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
+                <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-indigo-100 rounded-full blur-3xl" />
+                <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-sky-100 rounded-full blur-3xl" />
             </div>
 
             <div className="relative w-full max-w-md">
                 {/* Header */}
                 <div className="text-center mb-8">
                     <Link href="/" className="inline-flex items-center gap-2 mb-6">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-500/25">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
                             U
                         </div>
-                        <span className="text-2xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+                        <span className="text-2xl font-bold text-slate-900">
                             UniCompass
                         </span>
                     </Link>
-                    <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
-                    <p className="text-slate-400">
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h1>
+                    <p className="text-slate-600">
                         Join UniCompass to discover opportunities
                     </p>
                 </div>
 
                 {/* Form Card */}
-                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 shadow-2xl">
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
                     {error && (
-                        <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
                             {error}
                         </div>
                     )}
@@ -92,7 +92,7 @@ export default function RegisterPage() {
                         <div>
                             <label
                                 htmlFor="name"
-                                className="block text-sm font-medium text-slate-300 mb-1.5"
+                                className="block text-sm font-medium text-slate-700 mb-1.5"
                             >
                                 Full Name
                             </label>
@@ -103,7 +103,7 @@ export default function RegisterPage() {
                                 required
                                 value={formData.name}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
+                                className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
                                 placeholder="John Doe"
                             />
                         </div>
@@ -111,7 +111,7 @@ export default function RegisterPage() {
                         <div>
                             <label
                                 htmlFor="email"
-                                className="block text-sm font-medium text-slate-300 mb-1.5"
+                                className="block text-sm font-medium text-slate-700 mb-1.5"
                             >
                                 Email
                             </label>
@@ -122,7 +122,7 @@ export default function RegisterPage() {
                                 required
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
+                                className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
                                 placeholder="you@example.com"
                             />
                         </div>
@@ -130,7 +130,7 @@ export default function RegisterPage() {
                         <div>
                             <label
                                 htmlFor="password"
-                                className="block text-sm font-medium text-slate-300 mb-1.5"
+                                className="block text-sm font-medium text-slate-700 mb-1.5"
                             >
                                 Password
                             </label>
@@ -142,7 +142,7 @@ export default function RegisterPage() {
                                 minLength={6}
                                 value={formData.password}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
+                                className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
                                 placeholder="••••••••"
                             />
                         </div>
@@ -150,10 +150,10 @@ export default function RegisterPage() {
                         <div>
                             <label
                                 htmlFor="skills"
-                                className="block text-sm font-medium text-slate-300 mb-1.5"
+                                className="block text-sm font-medium text-slate-700 mb-1.5"
                             >
                                 Skills{" "}
-                                <span className="text-slate-500">(comma-separated)</span>
+                                <span className="text-slate-400">(comma-separated)</span>
                             </label>
                             <input
                                 id="skills"
@@ -161,7 +161,7 @@ export default function RegisterPage() {
                                 type="text"
                                 value={formData.skills}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
+                                className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
                                 placeholder="Python, React, Machine Learning"
                             />
                         </div>
@@ -169,10 +169,10 @@ export default function RegisterPage() {
                         <div>
                             <label
                                 htmlFor="interests"
-                                className="block text-sm font-medium text-slate-300 mb-1.5"
+                                className="block text-sm font-medium text-slate-700 mb-1.5"
                             >
                                 Interests{" "}
-                                <span className="text-slate-500">(comma-separated)</span>
+                                <span className="text-slate-400">(comma-separated)</span>
                             </label>
                             <input
                                 id="interests"
@@ -180,7 +180,7 @@ export default function RegisterPage() {
                                 type="text"
                                 value={formData.interests}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
+                                className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
                                 placeholder="AI, Web Development, Data Science"
                             />
                         </div>
@@ -188,7 +188,7 @@ export default function RegisterPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             {loading ? (
                                 <span className="inline-flex items-center gap-2">
@@ -219,11 +219,11 @@ export default function RegisterPage() {
                         </button>
                     </form>
 
-                    <p className="mt-6 text-center text-sm text-slate-400">
+                    <p className="mt-6 text-center text-sm text-slate-600">
                         Already have an account?{" "}
                         <Link
                             href="/login"
-                            className="text-violet-400 hover:text-violet-300 font-medium transition-colors"
+                            className="text-indigo-600 hover:text-indigo-500 font-medium transition-colors"
                         >
                             Sign in
                         </Link>
