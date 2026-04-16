@@ -70,9 +70,9 @@ export default function ResumeUpload({
     };
 
     return (
-        <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-6">
-            <h2 className="text-xl font-semibold text-white">Upload Resume</h2>
-            <p className="mt-2 text-sm text-slate-300">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Upload Resume</h2>
+            <p className="mt-1 text-sm text-slate-600">
                 Upload a PDF resume to automatically extract your profile using AI.
             </p>
 
@@ -82,12 +82,12 @@ export default function ResumeUpload({
                     accept="application/pdf"
                     onChange={handleFileChange}
                     disabled={isUploading}
-                    className="block w-full cursor-pointer rounded-lg border border-slate-600 bg-slate-950 px-4 py-3 text-sm text-slate-200 file:mr-4 file:rounded-md file:border-0 file:bg-cyan-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-950 hover:file:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="block w-full cursor-pointer rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 hover:border-indigo-300 transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
             </label>
 
             {isUploading && (
-                <p className="mt-4 text-sm text-cyan-300">
+                <p className="mt-4 text-sm text-indigo-600 font-medium">
                     Extracting your profile using Groq AI with Gemini fallback. This may take up to 10-15 seconds.
                 </p>
             )}
