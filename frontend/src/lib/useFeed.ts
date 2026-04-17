@@ -39,8 +39,13 @@ interface UseFeedOptions {
     limitPerFeed?: number;
 }
 
-const CACHE_KEY = "unicompass_feed_cache";
+const CACHE_KEY = "unicompass_feed_cache_v2"; // v2: course category removed
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// One-time migration: evict the old v1 key so stale course data is gone
+if (typeof window !== "undefined") {
+    localStorage.removeItem("unicompass_feed_cache");
+}
 
 interface CachedFeed {
     data: RssAggregationResponse;

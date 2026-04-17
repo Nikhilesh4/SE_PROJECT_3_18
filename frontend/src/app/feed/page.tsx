@@ -12,7 +12,6 @@ const ALL_CATEGORIES = [
     { value: "job", label: "Job", icon: "💼" },
     { value: "hackathon", label: "Hackathon", icon: "⚡" },
     { value: "research", label: "Research", icon: "🔬" },
-    { value: "course", label: "Course", icon: "📚" },
     { value: "freelance", label: "Freelance", icon: "🌐" },
 ];
 

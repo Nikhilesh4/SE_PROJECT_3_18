@@ -7,7 +7,6 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; dot: string }>
     internship: { bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-500" },
     hackathon: { bg: "bg-pink-50", text: "text-pink-700", dot: "bg-pink-500" },
     research: { bg: "bg-sky-50", text: "text-sky-700", dot: "bg-sky-500" },
-    course: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
     job: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" },
     freelance: { bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500" },
 };
