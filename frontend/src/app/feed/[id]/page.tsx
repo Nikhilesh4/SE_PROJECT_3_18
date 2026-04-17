@@ -10,7 +10,6 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string
     internship: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200", icon: "🎓" },
     hackathon: { bg: "bg-pink-50", text: "text-pink-700", border: "border-pink-200", icon: "⚡" },
     research: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200", icon: "🔬" },
-    course: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", icon: "📚" },
     job: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", icon: "💼" },
     freelance: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", icon: "🌐" },
 };
@@ -56,7 +55,7 @@ export default function OpportunityDetailPage() {
 
         // First try localStorage cache
         try {
-            const raw = localStorage.getItem("unicompass_feed_cache");
+            const raw = localStorage.getItem("unicompass_feed_cache_v2");
             if (raw) {
                 const cached = JSON.parse(raw);
                 const data: RssAggregationResponse = cached.data;
