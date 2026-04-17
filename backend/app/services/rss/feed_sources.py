@@ -130,12 +130,12 @@ FEED_SOURCES: tuple[FeedSource, ...] = (
     ),
     # RSS Bridge: GitHub repos tagged "hackathon 2025" (returns 200 ✓)
     FeedSource(
-        f"{_RSS_BRIDGE}/?action=display&bridge=GithubSearchBridge&searchterm=hackathon+2025&format=Atom",
+        f"{_RSS_BRIDGE}/?action=display&bridge=GithubSearchBridge&searchterm=hackathon%202025&format=Atom",
         "hackathon",
         "GitHub – Hackathon 2025 Repos",
     ),
     FeedSource(
-        f"{_RSS_BRIDGE}/?action=display&bridge=GithubSearchBridge&searchterm=hackathon+open+registration&format=Atom",
+        f"{_RSS_BRIDGE}/?action=display&bridge=GithubSearchBridge&searchterm=hackathon%20open%20registration&format=Atom",
         "hackathon",
         "GitHub – Hackathon Open Registration",
     ),
@@ -187,12 +187,6 @@ FEED_SOURCES: tuple[FeedSource, ...] = (
         "research",
         "Studying in Germany – Scholarships",
     ),
-
-    # ── COURSES ────────────────────────────────────────────────────────────
-    # Verified 200 ✓
-    FeedSource("https://www.classcentral.com/report/feed/", "course", "Class Central"),
-    FeedSource("https://blog.coursera.org/feed/", "course", "Coursera Blog"),
-    FeedSource("https://www.hackerrank.com/blog/feed", "course", "HackerRank Blog"),
 
     # ── FREELANCE ──────────────────────────────────────────────────────────
     # Verified 200 ✓ (PeoplePerHour & Freelancer.com both 404 — removed)

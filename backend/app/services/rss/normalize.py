@@ -120,7 +120,22 @@ def default_normalize_entry(
     link = (entry.get("link") or entry.get("id") or "").strip()
     if not title or not link:
         return None
+
+    # ── Skip RSS-Bridge / aggregator error items ──────────────────────────
+    _title_lower = title.lower()
+    if any(sig in _title_lower for sig in (
+        "bridge returned error",
+        "invalid parameters",
+        "error 0!",
+        "rssbridge error",
+    )):
+        return None
+
     summary_raw = entry.get("summary") or entry.get("description") or ""
+    # Reject items whose body is a PHP stack trace (RSS Bridge failure)
+    if "RssBridge" in summary_raw or "BridgeAbstract" in summary_raw:
+        return None
+
     guid = entry.get("id") or entry.get("guid") or link
     summary = strip_html(summary_raw)
 

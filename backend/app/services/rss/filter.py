@@ -317,6 +317,85 @@ _FREELANCE_ALLOW_PATTERNS: tuple[re.Pattern, ...] = tuple(
     )
 )
 
+# ---------------------------------------------------------------------------
+# COURSE — enrollment / opening filter
+# ---------------------------------------------------------------------------
+
+# Reject: blog articles, opinion, news recaps, retrospectives
+_COURSE_REJECT_PATTERNS: tuple[re.Pattern, ...] = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\breview\b",
+        r"\bopinion\b",
+        r"\bthoughts? on\b",
+        r"\bmy (journey|story|experience)\b",
+        r"\blessons? (i |learned?|from)\b",
+        r"\bwhat (i|we) learned?\b",
+        r"\byear in review\b",
+        r"\b(roundup|wrap.?up|recap)\b",
+        r"\bthe future of\b",
+        r"\btrends? in\b",
+        r"\bstate of (the )?\w+\b",
+        r"\bprediction(s)?\b",
+        r"\bwalk.?through\b",
+        r"\bcheat.?sheet\b",
+        r"\bcompare\b",
+        r"\bversus\b",
+        r"\b vs \b",
+        r"\bchangelog\b",
+        r"\bhow (coursera|edx|udemy|futurelearn|classcentral) works?\b",
+        r"\bnew (feature|update|release|blog|post)\b",
+    )
+)
+
+# Allow: must match at least one enrollment / opening signal
+_COURSE_ALLOW_PATTERNS: tuple[re.Pattern, ...] = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        # Enrollment / sign-up signals
+        r"\benroll(ment)?\b",
+        r"\bregister\b",
+        r"\bregistration\b",
+        r"\bsign.?up\b",
+        r"\bjoin (the )?(course|program|class|cohort|batch|bootcamp)\b",
+        r"\bapply (now|today|here|online|by)\b",
+        r"\bapplication (open|deadline)\b",
+        # Free / discount signals (core to coupon-feed sources)
+        r"\bfree (course|certificate|certification|access|enroll|class|training)\b",
+        r"\b100% (off|free)\b",
+        r"\bfree coupon\b",
+        r"\bcoupon\b",
+        r"\baudit(ing)? (this |for )?free\b",
+        r"\baccess for free\b",
+        r"\blimited (time|seats?|offer)\b",
+        r"\bfull (course|access) free\b",
+        # Timing / deadline signals
+        r"\bdeadline\b",
+        r"\bstart(s|ing|ed)? (on|from|in|this)\b",
+        r"\bstart date\b",
+        r"\bnow (available|open|live|accepting)\b",
+        r"\bopen (for |now)?enrollment\b",
+        r"\bopen (now|for students?)\b",
+        r"\bnew course\b",
+        r"\bnewly (added|available)\b",
+        r"\bupcoming (course|cohort|class|batch)\b",
+        r"\bregistration (open|deadline|closes?)\b",
+        # MOOC / certification format signals
+        r"\bmooc\b",
+        r"\bcertificate program\b",
+        r"\bcertification (course|program|exam|prep)\b",
+        r"\bcohort\b",
+        r"\bbatch\b",
+        r"\bbootcamp\b",
+        r"\bscholarship (available|for|open)\b",
+        r"\blearn .{0,30} for free\b",
+        r"\bfree .{0,30} course\b",
+        r"\bgrab (this )?(course|certificate|deal)\b",
+        r"\bseats? (available|limited|open)\b",
+        r"\bget (this )?course free\b",
+    )
+)
+
 
 def _match_any(patterns: tuple[re.Pattern, ...], text: str) -> bool:
     return any(p.search(text) for p in patterns)
@@ -365,5 +444,14 @@ def is_opportunity_post(title: str, summary: str, category: str) -> bool:
             return False
         return _match_any(_RESEARCH_ALLOW_PATTERNS, combined)
 
-    # course — no filtering
+    # ── Course (enrollment / opening filter) ─────────────────────────────
+    if category == "course":
+        # Step 1: reject blog articles, opinion pieces, news
+        if _match_any(_ARTICLE_TITLE_PATTERNS, title):
+            return False
+        if _match_any(_COURSE_REJECT_PATTERNS, title):
+            return False
+        # Step 2: must have at least one enrollment / opening signal
+        return _match_any(_COURSE_ALLOW_PATTERNS, combined)
+
     return True
