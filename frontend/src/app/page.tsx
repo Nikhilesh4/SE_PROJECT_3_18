@@ -1,19 +1,6 @@
- "use client";
-
 import Link from "next/link";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { getToken } from "@/lib/authSession";
 
 export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    if (getToken()) {
-      router.replace("/feed");
-    }
-  }, [router]);
-
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
       {/* Background gradient effects */}

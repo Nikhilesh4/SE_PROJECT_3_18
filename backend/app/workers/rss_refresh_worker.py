@@ -15,6 +15,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.services.rss.aggregator import ingest_feed_source
+from app.services.rss.adzuna_adapter import AdzunaAdapter
 from app.services.rss.cache_service import cache_service
 from app.services.rss.feed_sources import FEED_SOURCES
 from app.services.rss.refresh_strategy import CATEGORY_TTL_MINUTES
@@ -28,10 +29,10 @@ CHECK_INTERVAL_SECONDS = 60
 async def _refresh_category(category: str) -> None:
     """Fetch all feeds for a single category and persist to DB."""
     sources = [s for s in FEED_SOURCES if s.category == category]
-    if not sources:
-        return
 
     all_items = []
+
+    # ── RSS feeds ─────────────────────────────────────────────────────────
     for src in sources:
         try:
             items, status = ingest_feed_source(src, limit=50)
@@ -47,10 +48,19 @@ async def _refresh_category(category: str) -> None:
         except Exception as e:
             logger.error("[ERR]  %s → %s", src.source_name, e)
 
+    # ── Adzuna API adapter ─────────────────────────────────────────────────
+    try:
+        adzuna_items = AdzunaAdapter().fetch_for_category(category)
+        if adzuna_items:
+            all_items.extend(adzuna_items)
+            logger.info("[OK]   Adzuna API (%s) → %d items", category, len(adzuna_items))
+    except Exception as e:
+        logger.error("[ERR]  Adzuna API (%s) → %s", category, e)
+
     if all_items:
         count = cache_service.persist_items(all_items)
         logger.info(
-            "Category '%s': upserted %d items (%d from feeds)",
+            "Category '%s': upserted %d items (%d from feeds+api)",
             category,
             count,
             len(all_items),

@@ -83,9 +83,19 @@ class JoobleAdapter(OpportunityAdapter):
             "page": str(page),
         }
 
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+        }
+
         try:
             with httpx.Client(timeout=_TIMEOUT_SECONDS) as client:
-                resp = client.post(url, json=payload)
+                resp = client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPStatusError as exc:

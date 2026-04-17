@@ -9,6 +9,7 @@ import feedparser
 import httpx
 
 from app.schemas.rss_item import FeedSourceStatus, NormalizedRssItem, RssAggregationResponse
+from app.services.rss.adzuna_adapter import AdzunaAdapter
 from app.services.rss.feed_sources import FEED_SOURCES, FeedSource
 from app.services.rss.normalize import RssEntryNormalizer, default_normalize_entry
 
@@ -102,6 +103,7 @@ def aggregate_all_feeds(
 ) -> RssAggregationResponse:
     """
     Walk every FeedSource, fetch, normalize via `normalizer` (Protocol).
+    Also calls AdzunaAdapter to supplement with live job/internship listings.
 
     `limit_per_feed`: max entries taken from each feed after parse (None = all).
     `category_filter`: if set, only sources with this category string.
@@ -124,6 +126,38 @@ def aggregate_all_feeds(
             )
             all_items.extend(items)
             statuses.append(st)
+
+    # ── Adzuna API adapter ────────────────────────────────────────────────
+    # Only run if no category filter OR the filter applies to job/internship.
+    _adzuna_categories = {"internship", "job"}
+    if category_filter is None or category_filter in _adzuna_categories:
+        adzuna = AdzunaAdapter()
+        adzuna_ok = False
+        adzuna_count = 0
+        adzuna_error: str | None = None
+        try:
+            if category_filter:
+                adzuna_items = adzuna.fetch_for_category(category_filter)
+            else:
+                adzuna_items = adzuna.fetch_all()
+            all_items.extend(adzuna_items)
+            adzuna_count = len(adzuna_items)
+            adzuna_ok = True
+        except Exception as exc:  # noqa: BLE001
+            adzuna_error = str(exc)
+
+        statuses.append(
+            FeedSourceStatus(
+                feed_url="https://api.adzuna.com/v1/api/jobs",
+                category=category_filter or "job",
+                source_name="Adzuna API",
+                ok=adzuna_ok,
+                http_status=200 if adzuna_ok else None,
+                error=adzuna_error,
+                entries_fetched=adzuna_count,
+                items_normalized=adzuna_count,
+            )
+        )
 
     # ── Jooble API adapter (for job/internship categories) ──────────
     if category_filter is None or category_filter in ("job", "internship"):
@@ -162,6 +196,7 @@ def aggregate_all_feeds(
         total_items=len(all_items),
         fetched_at=fetched_at,
     )
+
 
 
 def fetch_jooble_opportunities() -> list[NormalizedRssItem]:

@@ -15,6 +15,7 @@ AI-powered opportunity discovery platform — aggregates internships, hackathons
 ## Prerequisites
 
 - **Node.js** ≥ 18
+- 
 - **Python** ≥ 3.10
 - **Docker** & **Docker Compose** (for PostgreSQL + Redis)
 

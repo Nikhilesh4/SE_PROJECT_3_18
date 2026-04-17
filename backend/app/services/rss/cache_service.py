@@ -79,22 +79,9 @@ class RssCacheService:
         db = SessionLocal()
         try:
             repo = RssItemRepository(db)
+            # Pull a bounded window from DB, then run active/deadline filtering in memory.
+            # This keeps endpoint responses stable while preserving RSS-source flexibility.
             rows: Sequence[RssItem] = repo.get_items(category=category, limit=800, offset=0)
-
-            # ── Drop RSS-Bridge / aggregator error rows ─────────────
-            _ERROR_SIGS = (
-                "bridge returned error",
-                "invalid parameters",
-                "error 0!",
-                "rssbridge error",
-            )
-            rows = [
-                r for r in rows
-                if not any(sig in (r.title or "").lower() for sig in _ERROR_SIGS)
-                and "RssBridge" not in (r.summary or "")
-                and "BridgeAbstract" not in (r.summary or "")
-            ]
-
             if active_only:
                 rows = [r for r in rows if self._is_active_item(r)]
             total = len(rows)
@@ -109,7 +96,6 @@ class RssCacheService:
             )
         finally:
             db.close()
-
 
     # ── Write to DB (called by the worker) ──────────────────────────
     def persist_items(self, items: list[NormalizedRssItem]) -> int:
@@ -187,10 +173,9 @@ class RssCacheService:
         if row.application_deadline is not None:
             return RssCacheService._as_utc(row.application_deadline) >= now
 
-        # Per-category freshness cutoffs (no explicit deadline available).
-        # Hackathons go stale quickly; other categories stay longer.
-        cutoff_days = 14 if row.category == "hackathon" else 45
-        recent_cutoff = now - timedelta(days=cutoff_days)
+        # Fallback for sources without explicit deadlines:
+        # keep only reasonably recent opportunities.
+        recent_cutoff = now - timedelta(days=45)
         if row.published_at is not None:
             return RssCacheService._as_utc(row.published_at) >= recent_cutoff
         if row.updated_at is not None:
