@@ -125,9 +125,48 @@ def aggregate_all_feeds(
             all_items.extend(items)
             statuses.append(st)
 
+    # ── Jooble API adapter (for job/internship categories) ──────────
+    if category_filter is None or category_filter in ("job", "internship"):
+        try:
+            jooble_items = fetch_jooble_opportunities()
+            all_items.extend(jooble_items)
+            statuses.append(
+                FeedSourceStatus(
+                    feed_url="jooble-api",
+                    category="job",
+                    source_name="Jooble",
+                    ok=True,
+                    http_status=200,
+                    error=None,
+                    entries_fetched=len(jooble_items),
+                    items_normalized=len(jooble_items),
+                )
+            )
+        except Exception as e:
+            statuses.append(
+                FeedSourceStatus(
+                    feed_url="jooble-api",
+                    category="job",
+                    source_name="Jooble",
+                    ok=False,
+                    http_status=None,
+                    error=str(e),
+                    entries_fetched=0,
+                    items_normalized=0,
+                )
+            )
+
     return RssAggregationResponse(
         items=all_items,
         sources=statuses,
         total_items=len(all_items),
         fetched_at=fetched_at,
     )
+
+
+def fetch_jooble_opportunities() -> list[NormalizedRssItem]:
+    """Convenience wrapper: instantiate JoobleAdapter and run default queries."""
+    from app.services.adapters.jooble_adapter import JoobleAdapter
+
+    adapter = JoobleAdapter()
+    return adapter.fetch_all_default_queries()
