@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app.routers import auth, feeds
 from app.db import engine, Base
 from app.workers.rss_refresh_worker import rss_refresh_loop
+from app.workers.ingestion_worker import ingestion_loop
 
 # Enable pgvector extension, then create all tables on startup
 with engine.connect() as conn:
@@ -37,15 +38,18 @@ with engine.connect() as conn:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    worker_task = asyncio.create_task(rss_refresh_loop(), name="rss-refresh-worker")
+    rss_task = asyncio.create_task(rss_refresh_loop(), name="rss-refresh-worker")
+    ingestion_task = asyncio.create_task(ingestion_loop(), name="ingestion-worker")
     try:
         yield
     finally:
-        worker_task.cancel()
-        try:
-            await worker_task
-        except asyncio.CancelledError:
-            pass
+        rss_task.cancel()
+        ingestion_task.cancel()
+        for task in (rss_task, ingestion_task):
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(
