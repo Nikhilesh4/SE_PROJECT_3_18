@@ -56,6 +56,23 @@ async def _refresh_category(category: str) -> None:
             len(all_items),
         )
 
+    # ── Jooble API adapter (supplements job/internship feeds) ──────
+    if category in ("job", "internship"):
+        try:
+            from app.services.adapters.jooble_adapter import JoobleAdapter
+
+            adapter = JoobleAdapter()
+            jooble_items = adapter.fetch_all_default_queries()
+            if jooble_items:
+                jooble_count = cache_service.persist_items(jooble_items)
+                logger.info(
+                    "Jooble: upserted %d items for category '%s'",
+                    jooble_count,
+                    category,
+                )
+        except Exception as e:
+            logger.error("Jooble ingestion failed for '%s': %s", category, e)
+
     cache_service.mark_refreshed(category)
 
 
