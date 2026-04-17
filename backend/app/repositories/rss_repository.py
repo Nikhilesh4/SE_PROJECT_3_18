@@ -104,20 +104,3 @@ class RssItemRepository:
         )
         self._db.commit()
         return result.rowcount  # type: ignore[return-value]
-
-    def purge_error_items(self) -> int:
-        """Delete RSS-Bridge error rows persisted in the DB."""
-        from sqlalchemy import or_
-        result = self._db.execute(
-            delete(RssItem).where(
-                or_(
-                    RssItem.title.ilike("%bridge returned error%"),
-                    RssItem.title.ilike("%invalid parameters%"),
-                    RssItem.title.ilike("%error 0!%"),
-                    RssItem.summary.contains("RssBridge"),
-                    RssItem.summary.contains("BridgeAbstract"),
-                )
-            )
-        )
-        self._db.commit()
-        return result.rowcount  # type: ignore[return-value]

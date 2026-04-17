@@ -33,15 +33,15 @@ export default function Navbar() {
     return (
         <nav className="fixed top-0 left-0 right-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
             <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                {/* Logo — not a link */}
-                <div className="flex items-center gap-2">
+                {/* Logo */}
+                <Link href="/" className="flex items-center gap-2 group">
                     <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
                         U
                     </div>
                     <span className="text-xl font-bold text-slate-900">
                         UniCompass
                     </span>
-                </div>
+                </Link>
 
                 {/* Navigation Links */}
                 <div className="flex items-center gap-4">
