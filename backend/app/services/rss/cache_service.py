@@ -79,9 +79,22 @@ class RssCacheService:
         db = SessionLocal()
         try:
             repo = RssItemRepository(db)
-            # Pull a bounded window from DB, then run active/deadline filtering in memory.
-            # This keeps endpoint responses stable while preserving RSS-source flexibility.
             rows: Sequence[RssItem] = repo.get_items(category=category, limit=800, offset=0)
+
+            # ── Drop RSS-Bridge / aggregator error rows ─────────────
+            _ERROR_SIGS = (
+                "bridge returned error",
+                "invalid parameters",
+                "error 0!",
+                "rssbridge error",
+            )
+            rows = [
+                r for r in rows
+                if not any(sig in (r.title or "").lower() for sig in _ERROR_SIGS)
+                and "RssBridge" not in (r.summary or "")
+                and "BridgeAbstract" not in (r.summary or "")
+            ]
+
             if active_only:
                 rows = [r for r in rows if self._is_active_item(r)]
             total = len(rows)
@@ -96,6 +109,7 @@ class RssCacheService:
             )
         finally:
             db.close()
+
 
     # ── Write to DB (called by the worker) ──────────────────────────
     def persist_items(self, items: list[NormalizedRssItem]) -> int:
