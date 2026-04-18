@@ -26,7 +26,7 @@ def list_rss_opportunities(
     ),
     category: str | None = Query(
         None,
-        description="Optional filter: internship, hackathon, research, course, job, freelance.",
+        description="Optional filter: internship, hackathon, research, job, freelance.",
     ),
     active_only: bool = Query(
         True,

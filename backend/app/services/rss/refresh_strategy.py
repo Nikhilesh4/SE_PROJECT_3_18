@@ -10,7 +10,6 @@ CATEGORY_TTL_MINUTES: dict[str, int] = {
     "internship": 180, # 3 hours — updated a few times daily
     "hackathon": 360,  # 6 hours — events don't change rapidly
     "research": 360,   # 6 hours — arXiv daily updates
-    "course": 720,     # 12 hours — course blogs update infrequently
 }
 
 DEFAULT_TTL_MINUTES: int = 120  # fallback for unknown categories

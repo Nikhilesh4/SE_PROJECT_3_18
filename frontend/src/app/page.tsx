@@ -30,9 +30,9 @@ export default function Home() {
 
           {/* Subheading */}
           <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
-            UniCompass aggregates internships, hackathons, research positions,
-            and courses from multiple sources — then matches them to your
-            skills and interests using AI.
+            UniCompass aggregates internships, hackathons, and research positions
+            from multiple sources — then matches them to your skills and
+            interests using AI.
           </p>
 
           {/* CTA Buttons */}

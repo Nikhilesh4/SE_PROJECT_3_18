@@ -12,9 +12,10 @@ const ALL_CATEGORIES = [
     { value: "job", label: "Job", icon: "💼" },
     { value: "hackathon", label: "Hackathon", icon: "⚡" },
     { value: "research", label: "Research", icon: "🔬" },
-    { value: "course", label: "Course", icon: "📚" },
     { value: "freelance", label: "Freelance", icon: "🌐" },
 ];
+
+const ITEMS_PER_PAGE = 50;
 
 function SkeletonCard() {
     return (
@@ -49,10 +50,14 @@ export default function FeedPage() {
     const { isAuthenticated, checking } = useAuth();
     const [selectedCategory, setSelectedCategory] = useState("");
     const [search, setSearch] = useState("");
+    const [page, setPage] = useState(1);
+
+    const offset = (page - 1) * ITEMS_PER_PAGE;
 
     const { data, loading, error, refetch } = useFeed({
         category: selectedCategory || undefined,
-        limitPerFeed: 50,
+        limitPerFeed: ITEMS_PER_PAGE,
+        offset,
     });
 
     // Client-side search filter on top of category filter
@@ -68,6 +73,14 @@ export default function FeedPage() {
                 item.tags.some((t) => t.toLowerCase().includes(q))
         );
     }, [data, search]);
+
+    const totalPages = data ? Math.max(1, Math.ceil(data.total_items / ITEMS_PER_PAGE)) : 1;
+
+    const handleCategoryChange = (value: string) => {
+        setSelectedCategory(value);
+        setSearch("");
+        setPage(1);
+    };
 
     // Auth guard — show spinner while checking
     if (checking || !isAuthenticated) {
@@ -173,7 +186,7 @@ export default function FeedPage() {
                                 return (
                                     <button
                                         key={cat.value}
-                                        onClick={() => { setSelectedCategory(cat.value); setSearch(""); }}
+                                        onClick={() => handleCategoryChange(cat.value)}
                                         className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left ${isActive
                                             ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                                             : "text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-transparent"
@@ -230,6 +243,7 @@ export default function FeedPage() {
                                         )}{" "}
                                         results{selectedCategory && <> · <span className="text-indigo-700">{selectedCategory}</span></>}
                                         {search && <> matching <span className="text-indigo-700">&ldquo;{search}&rdquo;</span></>}
+                                        {totalPages > 1 && <> · Page <span className="text-slate-800 font-medium">{page}</span> of {totalPages}</>}
                                     </p>
                                 )}
 
@@ -253,10 +267,64 @@ export default function FeedPage() {
                                             </p>
                                         </div>
                                         <button
-                                            onClick={() => { setSelectedCategory(""); setSearch(""); }}
+                                            onClick={() => { setSelectedCategory(""); setSearch(""); setPage(1); }}
                                             className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 transition-colors"
                                         >
                                             Clear filters
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* ── Pagination controls ── */}
+                                {totalPages > 1 && (
+                                    <div className="mt-8 flex items-center justify-center gap-3">
+                                        <button
+                                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                            disabled={page <= 1}
+                                            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border-slate-300 text-slate-700 hover:bg-slate-100"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="15 18 9 12 15 6" />
+                                            </svg>
+                                            Previous
+                                        </button>
+
+                                        <div className="flex items-center gap-1">
+                                            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                                                let pageNum: number;
+                                                if (totalPages <= 7) {
+                                                    pageNum = i + 1;
+                                                } else if (page <= 4) {
+                                                    pageNum = i + 1;
+                                                } else if (page >= totalPages - 3) {
+                                                    pageNum = totalPages - 6 + i;
+                                                } else {
+                                                    pageNum = page - 3 + i;
+                                                }
+                                                return (
+                                                    <button
+                                                        key={pageNum}
+                                                        onClick={() => setPage(pageNum)}
+                                                        className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${pageNum === page
+                                                                ? "bg-indigo-600 text-white shadow-sm"
+                                                                : "text-slate-700 hover:bg-slate-100 border border-transparent hover:border-slate-200"
+                                                            }`}
+                                                    >
+                                                        {pageNum}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <button
+                                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                            disabled={page >= totalPages}
+                                            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border-slate-300 text-slate-700 hover:bg-slate-100"
+                                        >
+                                            Next
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="9 18 15 12 9 6" />
+                                            </svg>
                                         </button>
                                     </div>
                                 )}

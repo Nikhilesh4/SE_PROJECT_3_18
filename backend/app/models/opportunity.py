@@ -22,7 +22,7 @@ class Opportunity(Base):
     source_url = Column(String, unique=True, nullable=True)
     category = Column(
         String, nullable=True
-    )  # 'internship', 'hackathon', 'research', 'course'
+    )  # 'internship', 'hackathon', 'research', 'job', 'freelance'
     deadline = Column(DateTime(timezone=True), nullable=True)
     embedding = Column(Vector(384), nullable=True) if HAS_PGVECTOR else Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

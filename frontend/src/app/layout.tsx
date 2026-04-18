@@ -11,7 +11,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "UniCompass — AI-Powered Opportunity Discovery",
   description:
-    "Discover internships, hackathons, research opportunities, and courses tailored to your profile.",
+    "Discover internships, hackathons, and research opportunities tailored to your profile.",
 };
 
 export default function RootLayout({

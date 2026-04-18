@@ -18,6 +18,7 @@ from app.services.rss.aggregator import ingest_feed_source
 from app.services.rss.adzuna_adapter import AdzunaAdapter
 from app.services.rss.cache_service import cache_service
 from app.services.rss.feed_sources import FEED_SOURCES
+from app.services.rss.filter import is_opportunity_post
 from app.services.rss.refresh_strategy import CATEGORY_TTL_MINUTES
 
 logger = logging.getLogger("rss.worker")
@@ -57,13 +58,28 @@ async def _refresh_category(category: str) -> None:
     except Exception as e:
         logger.error("[ERR]  Adzuna API (%s) → %s", category, e)
 
+    # ── Apply content filter to reject blog/news articles ──────────────
+    pre_filter_count = len(all_items)
+    all_items = [
+        item for item in all_items
+        if is_opportunity_post(item.title, item.summary, item.category)
+    ]
+    filtered_out = pre_filter_count - len(all_items)
+    if filtered_out:
+        logger.info(
+            "Category '%s': filtered out %d non-opportunity items",
+            category,
+            filtered_out,
+        )
+
     if all_items:
         count = cache_service.persist_items(all_items)
         logger.info(
-            "Category '%s': upserted %d items (%d from feeds+api)",
+            "Category '%s': upserted %d items (%d from feeds+api, %d filtered out)",
             category,
             count,
-            len(all_items),
+            pre_filter_count,
+            filtered_out,
         )
 
     # ── Jooble API adapter (supplements job/internship feeds) ──────

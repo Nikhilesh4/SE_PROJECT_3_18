@@ -26,10 +26,6 @@ The three sources below are verified project-listing boards.
 from dataclasses import dataclass
 from app.schemas.rss_item import OpportunityCategory
 
-# RSS Bridge base URL (running locally via docker-compose on port 3000)
-_RSS_BRIDGE = "http://localhost:3000"
-
-
 @dataclass(frozen=True)
 class FeedSource:
     url: str
@@ -127,17 +123,6 @@ FEED_SOURCES: tuple[FeedSource, ...] = (
         "https://techcrunch.com/tag/hackathon/feed/",
         "hackathon",
         "TechCrunch – Hackathon",
-    ),
-    # RSS Bridge: GitHub repos tagged "hackathon 2025" (returns 200 ✓)
-    FeedSource(
-        f"{_RSS_BRIDGE}/?action=display&bridge=GithubSearchBridge&searchterm=hackathon%202025&format=Atom",
-        "hackathon",
-        "GitHub – Hackathon 2025 Repos",
-    ),
-    FeedSource(
-        f"{_RSS_BRIDGE}/?action=display&bridge=GithubSearchBridge&searchterm=hackathon%20open%20registration&format=Atom",
-        "hackathon",
-        "GitHub – Hackathon Open Registration",
     ),
 
     # ── RESEARCH ───────────────────────────────────────────────────────────
