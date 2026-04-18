@@ -25,6 +25,7 @@ from app.schemas.rss_item import (
     NormalizedRssItem,
     RssAggregationResponse,
 )
+from app.services.rss.filter import is_opportunity_post
 from app.services.rss.refresh_strategy import CATEGORY_TTL_MINUTES, get_ttl_minutes
 
 logger = logging.getLogger("rss.cache")
@@ -84,6 +85,13 @@ class RssCacheService:
             rows: Sequence[RssItem] = repo.get_items(category=category, limit=800, offset=0)
             if active_only:
                 rows = [r for r in rows if self._is_active_item(r)]
+
+            # Apply content filter to reject blog/news articles from DB results
+            rows = [
+                r for r in rows
+                if is_opportunity_post(r.title, r.summary or "", r.category or "")
+            ]
+
             total = len(rows)
             rows = rows[offset : offset + limit]
             items = [self._row_to_schema(r) for r in rows]

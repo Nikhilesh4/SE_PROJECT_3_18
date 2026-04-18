@@ -11,6 +11,7 @@ import httpx
 from app.schemas.rss_item import FeedSourceStatus, NormalizedRssItem, RssAggregationResponse
 from app.services.rss.adzuna_adapter import AdzunaAdapter
 from app.services.rss.feed_sources import FEED_SOURCES, FeedSource
+from app.services.rss.filter import is_opportunity_post
 from app.services.rss.normalize import RssEntryNormalizer, default_normalize_entry
 
 DEFAULT_HEADERS = {
@@ -189,6 +190,12 @@ def aggregate_all_feeds(
                     items_normalized=0,
                 )
             )
+
+    # ── Apply content filter to reject blog/news articles ──────────────
+    all_items = [
+        item for item in all_items
+        if is_opportunity_post(item.title, item.summary, item.category)
+    ]
 
     return RssAggregationResponse(
         items=all_items,

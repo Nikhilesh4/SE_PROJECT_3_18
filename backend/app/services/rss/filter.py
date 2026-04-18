@@ -58,21 +58,25 @@ _ARTICLE_TITLE_PATTERNS: tuple[re.Pattern, ...] = tuple(
 # RESEARCH — opportunity filter
 # ---------------------------------------------------------------------------
 
-# Reject: blog articles, news, general academic tips
+# Reject: blog articles, news, general academic tips, country/visa guides
 _RESEARCH_REJECT_PATTERNS: tuple[re.Pattern, ...] = tuple(
     re.compile(p, re.IGNORECASE)
     for p in (
+        # General blog / article patterns
         r"\bhow to\b",
         r"\btips (for|on|to)\b",
         r"\bguide (to|for|on)\b",
-        r"\bbest (journals?|practices?|tools?)\b",
+        r"\bbest (journals?|practices?|tools?|universities)\b",
         r"\blist of\b",
         r"\btop \d+\b",
         r"\bwhat (is|are)\b",
         r"\bwhy (you|researchers?|students?)\b",
+        r"\beverything (you|to) (must |should )?know\b",
+        r"\bstep.by.step\b",
+        r"\bcomplete guide\b",
+        # Academic-advice / how-to content
         r"\bai plagiarism\b",
         r"\blearn(ing)? (to|how|about)\b",
-        r"\beverything (you|to) (must |should )?know\b",
         r"\bai (tool|checker|detector)\b",
         r"\bcited by\b",
         r"\bimpact factor\b",
@@ -83,6 +87,54 @@ _RESEARCH_REJECT_PATTERNS: tuple[re.Pattern, ...] = tuple(
         r"\bthesis (writing|tips|guide)\b",
         r"\bcybersecurity\b",
         r"\bmachine learning in\b",
+        # Country / visa / living-abroad guides (from blog sources)
+        r"\bvisa (application|process|requirements?|guide|types?|interview)\b",
+        r"\bcost of (living|studying)\b",
+        r"\bstudying in\b",  # "Studying in Germany: A Guide"
+        r"\bliving in\b",
+        r"\blife in\b",
+        r"\b(cheapest|affordable|best) (countries|cities|universities|places)\b",
+        r"\badmission (process|requirements?|guide|tips)\b",
+        r"\bielts\b",
+        r"\btoefl\b",
+        r"\bgre (prep|score|exam)\b",
+        r"\bgmat\b",
+        # News / opinion / recap
+        r"\bnews\b",
+        r"\bopinion\b",
+        r"\binterview (with|tips|questions|prep)\b",
+        r"\brecap\b",
+        r"\bhighlights?\b",
+        r"\bwrap.?up\b",
+        r"\bwhat we learned\b",
+        r"\bsuccess stor(y|ies)\b",
+        r"\binspir\b",
+        r"\bmotivation\b",
+        r"\bmy (journey|story|experience)\b",
+        r"\blessons? (i |learned|from)\b",
+        r"\byear in review\b",
+        r"\b(roundup|round.up)\b",
+        r"\bupdated? (for |in )?\d{4}\b",
+        # Additional blog/event patterns to filter out
+        r"\bwebinar\b",
+        r"\bconference report\b",
+        r"\bevent (recap|highlights|coverage)\b",
+        r"\bstudent success\b",
+        r"\bcareer (story|journey|profile|advice)\b",
+        r"\bwhy i chose\b",
+        r"\bmy experience\b",
+        r"\bhow to prepare\b",
+        r"\bprep (guide|tips|advice)\b",
+        r"\bintroduction to\b",
+        r"\bareas of\b",
+        r"\bdifference between\b",
+        r"\bcomparison\b",
+        r"\bfeatured researcher\b",
+        r"\bprofile\b",
+        r"\bspotlight\b",
+        r"\bfocus on\b",
+        r"\bexploring\b",
+        r"\binside\b",
     )
 )
 
@@ -90,6 +142,7 @@ _RESEARCH_REJECT_PATTERNS: tuple[re.Pattern, ...] = tuple(
 _RESEARCH_ALLOW_PATTERNS: tuple[re.Pattern, ...] = tuple(
     re.compile(p, re.IGNORECASE)
     for p in (
+        # PhD / Postdoc / Faculty positions (strong signals)
         r"\bphd (position|studentship|fellowship|scholarship|opening|vacancy|program|candidate)\b",
         r"\bphd student\b",
         r"\bpostdoc(toral)?\b",
@@ -100,6 +153,10 @@ _RESEARCH_ALLOW_PATTERNS: tuple[re.Pattern, ...] = tuple(
         r"\bscientist (position|opening)\b",
         r"\bjunior researcher\b",
         r"\bsenior researcher\b",
+        r"\blab (opening|position|assistant|manager|technician)\b",
+        r"\bprincipal investigator\b",
+        r"\bresearch lab\b",
+        # Fellowships / Scholarships / Grants (strong signals)
         r"\bfellowship\b",
         r"\bscholarship\b",
         r"\bgrant\b",
@@ -107,17 +164,10 @@ _RESEARCH_ALLOW_PATTERNS: tuple[re.Pattern, ...] = tuple(
         r"\bstipend\b",
         r"\bfunding (opportunity|available|for)\b",
         r"\bbursary\b",
-        r"\bstudy (abroad|in|opportunity)\b",
+        r"\bfinancial (aid|support|assistance)\b",
+        # Specific programs
+        r"\bstudy abroad\b",
         r"\bexchange (program|opportunity)\b",
-        r"\bapply (by|before|now|online|here)\b",
-        r"\bapplication (deadline|open|window|period|invited)\b",
-        r"\bcall for (applications?|proposals?|candidates?|researchers?)\b",
-        r"\bdeadline\b",
-        r"\bopening (for|in|at)\b",
-        r"\bvacancy\b",
-        r"\bwe are (recruiting|seeking|looking for)\b",
-        r"\bjoin (our|the) (lab|group|team|program)\b",
-        r"\brecruit(ing|ment)?\b",
         r"\bsummer (research|internship|program|school)\b",
         r"\bwinter (school|program)\b",
         r"\breu program\b",
@@ -129,7 +179,28 @@ _RESEARCH_ALLOW_PATTERNS: tuple[re.Pattern, ...] = tuple(
         r"\bwellcome\b",
         r"\bnsf (grant|fellowship)\b",
         r"\bnih (grant|fellowship)\b",
-        r"\binternational (scholarship|fellowship|opportunity)\b",
+        r"\binternational (scholarship|fellowship)\b",
+    )
+)
+
+# Strong application signals that indicate a real opportunity listing
+_RESEARCH_APPLICATION_SIGNALS: tuple[re.Pattern, ...] = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bapply (by|before|now|online|here)\b",
+        r"\bapplication (deadline|open|window|period|invited)\b",
+        r"\bcall for (applications?|proposals?|candidates?|researchers?)\b",
+        r"\bdeadline\b",
+        r"\bopening (for|in|at)\b",
+        r"\bvacancy\b",
+        r"\bwe are (recruiting|seeking|looking for|inviting)\b",
+        r"\bjoin (our|the) (lab|group|team|program|research)\b",
+        r"\brecruit(ing|ment)?\b",
+        r"\bhow to apply\b",
+        r"\bapplication procedure\b",
+        r"\bsubmit (your )?application\b",
+        r"\benroll\b",
+        r"\bintake\b",
     )
 )
 
@@ -234,7 +305,38 @@ _HACKATHON_REJECT_PATTERNS: tuple[re.Pattern, ...] = tuple(
 )
 
 # ---------------------------------------------------------------------------
-# Job / Internship ALLOW patterns
+# Internship ALLOW patterns (must have internship-specific signals)
+# ---------------------------------------------------------------------------
+
+_INTERNSHIP_ALLOW_PATTERNS: tuple[re.Pattern, ...] = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bintern(ship)?\b",
+        r"\binternships?\b",
+        r"\bsummer intern\b",
+        r"\bwinter intern\b",
+        r"\bspring intern\b",
+        r"\bfall intern\b",
+        r"\bco.?op\b",
+        r"\btrainee\b",
+        r"\bapprentice(ship)?\b",
+        r"\bentry.?level\b",
+        r"\bfresher(s)?\b",
+        r"\bgraduate (trainee|program|role|position|intern)\b",
+        r"\bjunior (developer|engineer|designer|analyst|associate)\b",
+        r"\bstudent (position|role|job|placement|worker|assistant)\b",
+        r"\bplacement\b",
+        r"\bwork (study|experience)\b",
+        r"\bcampus (recruit|hire|hiring)\b",
+        r"\bcollege (recruit|hire|hiring|students?)\b",
+        r"\bstipend\b",
+        r"\bunpaid\b",
+        r"\bpaid intern\b",
+    )
+)
+
+# ---------------------------------------------------------------------------
+# Job ALLOW patterns
 # ---------------------------------------------------------------------------
 
 _JOB_ALLOW_PATTERNS: tuple[re.Pattern, ...] = tuple(
@@ -418,8 +520,11 @@ def is_opportunity_post(title: str, summary: str, category: str) -> bool:
         if _match_any(_ARTICLE_TITLE_PATTERNS, title):
             return False
 
-    if category in ("job", "internship"):
+    if category == "job":
         return _match_any(_JOB_ALLOW_PATTERNS, combined)
+
+    if category == "internship":
+        return _match_any(_INTERNSHIP_ALLOW_PATTERNS, combined)
 
     if category == "freelance":
         return _match_any(_FREELANCE_ALLOW_PATTERNS, combined)
@@ -438,11 +543,17 @@ def is_opportunity_post(title: str, summary: str, category: str) -> bool:
         return has_action and has_event
 
     if category == "research":
+        # Step 1: reject articles and general guidance first
         if _match_any(_ARTICLE_TITLE_PATTERNS, title):
             return False
         if _match_any(_RESEARCH_REJECT_PATTERNS, title):
             return False
-        return _match_any(_RESEARCH_ALLOW_PATTERNS, combined)
+        if _match_any(_RESEARCH_REJECT_PATTERNS, combined):
+            return False
+        # Step 2: must have BOTH a research opportunity signal AND an application signal
+        has_opportunity_signal = _match_any(_RESEARCH_ALLOW_PATTERNS, combined)
+        has_application_signal = _match_any(_RESEARCH_APPLICATION_SIGNALS, combined)
+        return has_opportunity_signal and has_application_signal
 
     # ── Course (enrollment / opening filter) ─────────────────────────────
     if category == "course":
