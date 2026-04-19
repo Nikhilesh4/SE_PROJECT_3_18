@@ -20,6 +20,7 @@ from app.services.rss.cache_service import cache_service
 from app.services.rss.feed_sources import FEED_SOURCES
 from app.services.rss.filter import is_opportunity_post
 from app.services.rss.refresh_strategy import CATEGORY_TTL_MINUTES
+from app.services.redis_cache import redis_cache
 
 logger = logging.getLogger("rss.worker")
 
@@ -100,6 +101,17 @@ async def _refresh_category(category: str) -> None:
             logger.error("Jooble ingestion failed for '%s': %s", category, e)
 
     cache_service.mark_refreshed(category)
+
+    # ── Cache Invalidation Tactic ────────────────────────────────────────
+    # After a category refresh, clear all feed cache keys for that category
+    # so users never receive stale paginated responses.
+    # Pattern: Event-driven cache invalidation on data write.
+    invalidated = redis_cache.delete_pattern(f"feed:{category}:*")
+    logger.info(
+        "RSS worker: invalidated %d feed cache keys for category '%s'",
+        invalidated,
+        category,
+    )
 
 
 async def rss_refresh_loop() -> None:

@@ -105,9 +105,30 @@ export default function FeedPage() {
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 pt-24">
                 {/* Page header */}
                 <div className="mb-8">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium mb-4">
-                        <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
-                        Live RSS Aggregation
+                    {/* Data-source indicator — tells TA/dev where this response came from */}
+                    <div className="flex items-center gap-2 mb-4 flex-wrap">
+                        {/* Always-on badge */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium">
+                            <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+                            Live RSS Aggregation
+                        </div>
+
+                        {/* Dynamic cache-origin badge — only shown once data arrives */}
+                        {data && (
+                            <div
+                                title={data.from_cache
+                                    ? "Response served from Redis cache (fast path — no DB query)"
+                                    : "Response fetched fresh from PostgreSQL (cache miss)"}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all ${
+                                    data.from_cache
+                                        ? "bg-amber-50 border-amber-300 text-amber-700"
+                                        : "bg-emerald-50 border-emerald-300 text-emerald-700"
+                                }`}
+                            >
+                                <span>{data.from_cache ? "⚡" : "🗄️"}</span>
+                                <span>{data.from_cache ? "Redis Cache" : "PostgreSQL DB"}</span>
+                            </div>
+                        )}
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                         <div>
@@ -306,8 +327,8 @@ export default function FeedPage() {
                                                         key={pageNum}
                                                         onClick={() => setPage(pageNum)}
                                                         className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${pageNum === page
-                                                                ? "bg-indigo-600 text-white shadow-sm"
-                                                                : "text-slate-700 hover:bg-slate-100 border border-transparent hover:border-slate-200"
+                                                            ? "bg-indigo-600 text-white shadow-sm"
+                                                            : "text-slate-700 hover:bg-slate-100 border border-transparent hover:border-slate-200"
                                                             }`}
                                                     >
                                                         {pageNum}

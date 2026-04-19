@@ -17,4 +17,5 @@ export interface ProfileData {
     experience: ExperienceItem[];
     interests: string[];
     updated_at?: string | null;
+    from_cache: boolean;
 }
