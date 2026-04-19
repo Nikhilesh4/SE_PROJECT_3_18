@@ -47,7 +47,17 @@ export default function ProfilePage() {
 
             <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-8 pt-24 space-y-6">
                 <header className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Profile Builder</h1>
+                    <div className="flex items-center gap-2 mb-4">
+                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Profile Builder</h1>
+                        {profile && (
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all ${profile.from_cache
+                                ? "bg-amber-50 border-amber-300 text-amber-700"
+                                : "bg-emerald-50 border-emerald-300 text-emerald-700"
+                                }`}>
+                                <span>{profile.from_cache ? "⚡ Redis Cache" : "🗄️ PostgreSQL DB"}</span>
+                            </div>
+                        )}
+                    </div>
                     <p className="mt-1 text-slate-600 text-sm">
                         Upload your resume PDF to generate a structured profile with skills, education, and experience.
                     </p>

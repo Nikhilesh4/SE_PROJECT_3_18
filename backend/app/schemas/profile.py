@@ -26,6 +26,7 @@ class ProfileStructured(BaseModel):
 
 class ProfileOut(ProfileStructured):
     updated_at: Optional[datetime] = None
+    from_cache: bool = False
 
     class Config:
         from_attributes = True

@@ -53,3 +53,7 @@ class RssAggregationResponse(BaseModel):
     sources: list[FeedSourceStatus]
     total_items: int
     fetched_at: datetime
+    # Injected at the router level — not persisted in Redis.
+    # True  → data was served from Redis (fast path)
+    # False → data was fetched from PostgreSQL (cache miss)
+    from_cache: bool = False

@@ -21,6 +21,7 @@ import httpx
 from app.config import settings
 from app.schemas.rss_item import NormalizedRssItem
 from app.services.adapters.base_adapter import OpportunityAdapter
+from app.services.redis_cache import redis_cache
 
 logger = logging.getLogger("adapters.jooble")
 
@@ -93,25 +94,38 @@ class JoobleAdapter(OpportunityAdapter):
             ),
         }
 
-        try:
-            with httpx.Client(timeout=_TIMEOUT_SECONDS) as client:
-                resp = client.post(url, json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPStatusError as exc:
-            logger.error(
-                "Jooble API HTTP %s for query=%r: %s",
-                exc.response.status_code,
-                keywords,
-                exc.response.text[:300],
-            )
-            return []
-        except httpx.RequestError as exc:
-            logger.error("Jooble API request failed for query=%r: %s", keywords, exc)
-            return []
-        except Exception as exc:
-            logger.error("Unexpected error from Jooble API: %s", exc)
-            return []
+        # ── Source Cache-Aside (Ingestion Side) ─────────────────────────
+        # Key: source:jooble:{keywords}:{location}:{page}:latest
+        # TTL: 30 minutes — prevents redundant external API calls if the
+        # ingestion worker retries after a crash and helps stay within rate limits.
+        _src_key = f"source:jooble:{keywords}:{location}:{page}:latest"
+        cached_raw = redis_cache.get(_src_key)
+        if cached_raw is not None:
+            logger.debug("Source cache HIT for Jooble query=%r", keywords)
+            data = cached_raw
+        else:
+            try:
+                with httpx.Client(timeout=_TIMEOUT_SECONDS) as client:
+                    resp = client.post(url, json=payload, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "Jooble API HTTP %s for query=%r: %s",
+                    exc.response.status_code,
+                    keywords,
+                    exc.response.text[:300],
+                )
+                return []
+            except httpx.RequestError as exc:
+                logger.error("Jooble API request failed for query=%r: %s", keywords, exc)
+                return []
+            except Exception as exc:
+                logger.error("Unexpected error from Jooble API: %s", exc)
+                return []
+
+            # Store raw response for 30 minutes
+            redis_cache.set(_src_key, data, ttl_seconds=1800)
 
         jobs = data.get("jobs", [])
         if not jobs:

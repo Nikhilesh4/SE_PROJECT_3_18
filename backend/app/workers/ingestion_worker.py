@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from app.db import SessionLocal
 from app.repositories.rss_repository import RssItemRepository
 from app.services.adapters.aggregator_facade import AggregatorFacade
+from app.services.redis_cache import redis_cache
 
 logger = logging.getLogger("workers.ingestion")
 
@@ -56,6 +57,14 @@ async def _run_ingestion_cycle() -> dict:
         len(items),
         upserted,
     )
+
+    # ── Cache Invalidation Tactic ────────────────────────────────────────
+    # After every successful ingestion batch, wipe the entire feed cache so
+    # the next API request always returns freshly persisted data.
+    # Pattern: Cache-Aside invalidation triggered by a write-behind event.
+    invalidated = redis_cache.delete_pattern("feed:*")
+    logger.info("Ingestion: invalidated %d feed cache keys after batch", invalidated)
+
     return {"fetched": len(items), "upserted": upserted}
 
 

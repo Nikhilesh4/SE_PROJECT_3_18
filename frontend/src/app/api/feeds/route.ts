@@ -17,12 +17,14 @@ export async function GET(request: NextRequest) {
     const backendEndpoint = `${BACKEND_URL}/api/feeds/rss${params.size > 0 ? `?${params}` : ""}`;
 
     try {
+        console.log(`[Frontend API] Fetching from backend: ${backendEndpoint}`);
         const res = await fetch(backendEndpoint, {
             headers: { Accept: "application/json" },
             next: { revalidate: 0 }, // always fresh
         });
 
         if (!res.ok) {
+            console.error(`[Frontend API] Backend error: ${res.status} ${res.statusText}`);
             return NextResponse.json(
                 { error: `Backend returned ${res.status}` },
                 { status: res.status }
@@ -31,7 +33,13 @@ export async function GET(request: NextRequest) {
 
         const data = await res.json();
         return NextResponse.json(data);
-    } catch (err) {
+    } catch (err: any) {
+        console.error(`[Frontend API] Request failed:`, {
+            endpoint: backendEndpoint,
+            error: err.message,
+            code: err.code,
+            stack: err.stack
+        });
         return NextResponse.json(
             { error: `Failed to reach backend: ${String(err)}` },
             { status: 502 }

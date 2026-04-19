@@ -32,6 +32,7 @@ export interface RssAggregationResponse {
     sources: FeedSourceStatus[];
     total_items: number;
     fetched_at: string;
+    from_cache: boolean;
 }
 
 interface UseFeedOptions {
