@@ -11,8 +11,6 @@ export default function RegisterPage() {
         name: "",
         email: "",
         password: "",
-        skills: "",
-        interests: "",
     });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -31,14 +29,6 @@ export default function RegisterPage() {
                 name: formData.name,
                 email: formData.email,
                 password: formData.password,
-                skills: formData.skills
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                interests: formData.interests
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
             };
 
             await api.post("/auth/register", payload);
@@ -144,44 +134,6 @@ export default function RegisterPage() {
                                 onChange={handleChange}
                                 className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
                                 placeholder="••••••••"
-                            />
-                        </div>
-
-                        <div>
-                            <label
-                                htmlFor="skills"
-                                className="block text-sm font-medium text-slate-700 mb-1.5"
-                            >
-                                Skills{" "}
-                                <span className="text-slate-400">(comma-separated)</span>
-                            </label>
-                            <input
-                                id="skills"
-                                name="skills"
-                                type="text"
-                                value={formData.skills}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
-                                placeholder="Python, React, Machine Learning"
-                            />
-                        </div>
-
-                        <div>
-                            <label
-                                htmlFor="interests"
-                                className="block text-sm font-medium text-slate-700 mb-1.5"
-                            >
-                                Interests{" "}
-                                <span className="text-slate-400">(comma-separated)</span>
-                            </label>
-                            <input
-                                id="interests"
-                                name="interests"
-                                type="text"
-                                value={formData.interests}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
-                                placeholder="AI, Web Development, Data Science"
                             />
                         </div>
 

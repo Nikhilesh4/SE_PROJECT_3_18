@@ -13,6 +13,7 @@ const ALL_CATEGORIES = [
     { value: "hackathon", label: "Hackathon", icon: "⚡" },
     { value: "research", label: "Research", icon: "🔬" },
     { value: "freelance", label: "Freelance", icon: "🌐" },
+    { value: "course", label: "Course", icon: "📚" },
 ];
 
 const ITEMS_PER_PAGE = 50;
@@ -119,11 +120,10 @@ export default function FeedPage() {
                                 title={data.from_cache
                                     ? "Response served from Redis cache (fast path — no DB query)"
                                     : "Response fetched fresh from PostgreSQL (cache miss)"}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all ${
-                                    data.from_cache
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all ${data.from_cache
                                         ? "bg-amber-50 border-amber-300 text-amber-700"
                                         : "bg-emerald-50 border-emerald-300 text-emerald-700"
-                                }`}
+                                    }`}
                             >
                                 <span>{data.from_cache ? "⚡" : "🗄️"}</span>
                                 <span>{data.from_cache ? "Redis Cache" : "PostgreSQL DB"}</span>

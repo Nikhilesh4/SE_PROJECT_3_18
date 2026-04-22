@@ -12,6 +12,7 @@ OpportunityCategory = Literal[
     "research",
     "job",
     "freelance",
+    "course",
 ]
 
 

@@ -187,4 +187,80 @@ FEED_SOURCES: tuple[FeedSource, ...] = (
         "freelance",
         "RemoteOK – Freelance",
     ),
+
+    # ── COURSES ────────────────────────────────────────────────────────────
+    # COURSE NOTE
+    # -----------
+    # Only feeds that publish new enrollment listings, free-coupon drops, or
+    # upcoming batch/cohort openings are included here.  Blog posts, reviews,
+    # opinion pieces, and news articles are rejected by the course filter in
+    # filter.py (is_opportunity_post, category="course").
+    #
+    # Sources that work well:
+    #   - Class Central: aggregates enrollment-open announcements for MOOCs
+    #     across Coursera, edX, FutureLearn, Udemy, etc.
+    #   - freeCodeCamp News: publishes new free curriculum and course launches
+    #   - Real Python: publishes new tutorial/course release announcements
+    #   - Coursera Blog: publishes new course & certificate program launches
+    #   - edX Blog: publishes new program and course open-enrollment posts
+    FeedSource(
+        "https://www.classcentral.com/report/feed/",
+        "course",
+        "Class Central – MOOC Listings",
+    ),
+    FeedSource(
+        "https://www.freecodecamp.org/news/rss/",
+        "course",
+        "freeCodeCamp – Free Courses",
+    ),
+    FeedSource(
+        "https://realpython.com/atom.xml",
+        "course",
+        "Real Python – Course Releases",
+    ),
+    FeedSource(
+        "https://blog.coursera.org/feed/",
+        "course",
+        "Coursera Blog – New Programs",
+    ),
+    FeedSource(
+        "https://blog.edx.org/feed/",
+        "course",
+        "edX Blog – New Courses",
+    ),
+    FeedSource(
+        "https://ocw.mit.edu/rss/new_ocw_courses.xml",
+        "course",
+        "MIT OpenCourseWare – New Courses",
+    ),
+    FeedSource(
+        "https://blog.udacity.com/feed",
+        "course",
+        "Udacity Blog – New Nanodegrees",
+    ),
+    FeedSource(
+        "https://www.datacamp.com/blog/rss.xml",
+        "course",
+        "DataCamp – New Courses & Tracks",
+    ),
+    FeedSource(
+        "https://www.simplilearn.com/resources/rss.xml",
+        "course",
+        "Simplilearn – Free Courses",
+    ),
+    FeedSource(
+        "https://alison.com/blog/rss",
+        "course",
+        "Alison – Free Online Courses",
+    ),
+    FeedSource(
+        "https://learndigital.withgoogle.com/digitalgarage/rss.xml",
+        "course",
+        "Google Digital Garage – Free Courses",
+    ),
+    FeedSource(
+        "https://www.futurelearn.com/info/blog/feed",
+        "course",
+        "FutureLearn – New Programs",
+    ),
 )
