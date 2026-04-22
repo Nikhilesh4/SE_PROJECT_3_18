@@ -12,12 +12,30 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+class RegisterResponse(UserResponse):
+    """Extended registration response that also includes a JWT so the
+    frontend can auto-login without a second round-trip.
+
+    Pattern: Data Transfer Object (DTO) — extends UserResponse with the
+    access_token field only for the registration endpoint.
+    """
+    access_token: str
+
+
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
-    Register a new user.
-    Accepts name, email, password, skills, and interests.
-    Hashes the password with bcrypt before storing.
+    Register a new user and return a JWT so the client can auto-login.
+
+    Flow:
+      1. Validate email uniqueness
+      2. Hash password with bcrypt
+      3. Persist User row
+      4. Issue JWT (same logic as /auth/login)
+      5. Return user fields + access_token
+
+    This eliminates the register → login redirect round-trip and enables
+    the frontend to redirect directly to /profile after registration.
     """
     # Check if email already exists
     existing = db.query(User).filter(User.email == user_data.email).first()
@@ -42,7 +60,21 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    return new_user
+    # Issue JWT immediately so the client doesn't need a second login call
+    access_token = create_access_token(data={"sub": str(new_user.id)})
+
+    # Build response from an explicit dict so Pydantic gets access_token
+    # at validation time — model_validate(orm_object) fails because the User
+    # ORM object has no access_token field and it is required (no default).
+    return RegisterResponse(
+        id=new_user.id,
+        name=new_user.name,
+        email=new_user.email,
+        skills=new_user.skills or [],
+        interests=new_user.interests or [],
+        created_at=new_user.created_at,
+        access_token=access_token,
+    )
 
 
 @router.post("/login", response_model=Token)
