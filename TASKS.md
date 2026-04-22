@@ -9,7 +9,7 @@
 
 ## 1. Project Setup & Database
 
-Set up the full development environment. Initialize a FastAPI backend and a Next.js frontend. Set up PostgreSQL as the primary database and install the pgvector extension for vector similarity search. Set up Redis for caching. Design the database schema with tables for users, opportunities, bookmarks, and profiles. Create SQLAlchemy models for all tables and wire up the database connection in FastAPI. Create a `.env` file to store API keys for Gemini, Adzuna, and Jooble. Push everything to a GitHub repository.
+Set up the full development environment. Initialize a FastAPI backend and a Next.js frontend. Set up PostgreSQL as the primary database and install the pgvector extension for vector similarity search. Set up Redis for caching. Design the database schema with tables for users, opportunities, bookmarks, and profiles. Create SQLAlchemy models for all tables and wire up the database connection in FastAPI. Create a `.env` file to store API keys for Gemini, Adzuna, and Jooble. Push everything to a GitHub Vrepository.
 
 ---
 
