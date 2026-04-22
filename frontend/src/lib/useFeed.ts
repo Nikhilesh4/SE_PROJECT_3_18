@@ -1,5 +1,19 @@
 "use client";
 
+/**
+ * useFeed — Data-fetching hook for the RSS opportunity feed.
+ *
+ * Design Patterns:
+ *   - Hook Pattern: Encapsulates all fetching, caching, and error state.
+ *   - Cache-Aside (client-side): Persists the last fetch to localStorage so
+ *     the page renders instantly on revisit (stale-while-revalidate feel).
+ *
+ * Skill-based Relevance:
+ *   When `skills` is provided the hook appends them as a query param.
+ *   The backend re-ranks results by tag/title overlap with the skill set
+ *   and caches the personalised slice separately (skills_hash in cache key).
+ */
+
 import { useCallback, useEffect, useState } from "react";
 
 export interface NormalizedRssItem {
@@ -39,6 +53,8 @@ interface UseFeedOptions {
     category?: string;
     limitPerFeed?: number;
     offset?: number;
+    /** User skills extracted from resume — triggers relevance-based ranking */
+    skills?: string[];
 }
 
 const CACHE_KEY = "unicompass_feed_cache";
@@ -48,16 +64,27 @@ interface CachedFeed {
     data: RssAggregationResponse;
     category: string;
     offset: number;
+    skillsKey: string;
     timestamp: number;
 }
 
-function getCachedFeed(category: string, offset: number): RssAggregationResponse | null {
+function skillsKey(skills: string[] | undefined): string {
+    if (!skills || skills.length === 0) return "";
+    return [...skills].sort().join(",").toLowerCase();
+}
+
+function getCachedFeed(
+    category: string,
+    offset: number,
+    sk: string
+): RssAggregationResponse | null {
     try {
         const raw = localStorage.getItem(CACHE_KEY);
         if (!raw) return null;
         const cached: CachedFeed = JSON.parse(raw);
         if (cached.category !== category) return null;
         if (cached.offset !== offset) return null;
+        if (cached.skillsKey !== sk) return null;
         if (Date.now() - cached.timestamp > CACHE_TTL_MS) return null;
         return cached.data;
     } catch {
@@ -65,28 +92,40 @@ function getCachedFeed(category: string, offset: number): RssAggregationResponse
     }
 }
 
-function setCachedFeed(category: string, offset: number, data: RssAggregationResponse): void {
+function setCachedFeed(
+    category: string,
+    offset: number,
+    sk: string,
+    data: RssAggregationResponse
+): void {
     try {
-        const entry: CachedFeed = { data, category, offset, timestamp: Date.now() };
+        const entry: CachedFeed = { data, category, offset, skillsKey: sk, timestamp: Date.now() };
         localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
     } catch {
         // localStorage might be full — silently ignore
     }
 }
 
-export function useFeed({ category, limitPerFeed = 50, offset = 0 }: UseFeedOptions = {}) {
+export function useFeed({
+    category,
+    limitPerFeed = 50,
+    offset = 0,
+    skills,
+}: UseFeedOptions = {}) {
     const cat = category ?? "";
+    const sk = skillsKey(skills);
+
     const [data, setData] = useState<RssAggregationResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // On mount / category change — load from localStorage first (instant)
+    // On mount / parameter change — load from localStorage first (instant)
     useEffect(() => {
-        const cached = getCachedFeed(cat, offset);
+        const cached = getCachedFeed(cat, offset, sk);
         if (cached) {
             setData(cached);
         }
-    }, [cat, offset]);
+    }, [cat, offset, sk]);
 
     const fetch_ = useCallback(async () => {
         setLoading(true);
@@ -95,6 +134,7 @@ export function useFeed({ category, limitPerFeed = 50, offset = 0 }: UseFeedOpti
             const params = new URLSearchParams({ limit_per_feed: String(limitPerFeed) });
             if (category) params.set("category", category);
             if (offset > 0) params.set("offset", String(offset));
+            if (sk) params.set("skills", sk); // comma-separated skills string
 
             const res = await fetch(`/api/feeds?${params}`);
             if (!res.ok) {
@@ -103,13 +143,13 @@ export function useFeed({ category, limitPerFeed = 50, offset = 0 }: UseFeedOpti
             }
             const json: RssAggregationResponse = await res.json();
             setData(json);
-            setCachedFeed(cat, offset, json); // persist to localStorage
+            setCachedFeed(cat, offset, sk, json); // persist to localStorage
         } catch (err) {
             setError(String(err));
         } finally {
             setLoading(false);
         }
-    }, [category, limitPerFeed, cat, offset]);
+    }, [category, limitPerFeed, cat, offset, sk]);
 
     useEffect(() => {
         fetch_();

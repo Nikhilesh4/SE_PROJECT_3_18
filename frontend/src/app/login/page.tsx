@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { persistToken } from "@/lib/authSession";
+import { clearProfileCache } from "@/lib/useProfile";
 
 function LoginForm() {
     const router = useRouter();
@@ -27,6 +28,11 @@ function LoginForm() {
         try {
             const response = await api.post("/auth/login", formData);
             const { access_token } = response.data;
+
+            // Clear any previous account's profile from the in-memory singleton
+            // BEFORE persisting the new token. This prevents account A's cached
+            // skills from leaking into account B's session.
+            clearProfileCache();
 
             // Persist auth in both localStorage and cookie for UI consistency.
             persistToken(access_token);
