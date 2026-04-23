@@ -1,0 +1,97 @@
+@startuml arch_a_component
+skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #336699
+skinparam ArrowThickness 2
+skinparam rectangleBorderColor #336699
+
+title Architecture A -- Hybrid Event-Driven Cache-Aside\nComponent & Architecture Diagram (Implemented)
+
+actor "Student (Browser)" as S
+
+rectangle "Hybrid Event-Driven Cache-Aside Architecture" {
+
+  rectangle "API / Read Path (LT 5 ms on cache hit)" #LightBlue {
+    component [JWT Middleware\nStateless token verify] as JWT
+    component [FastAPI Router\n/api/feeds/rss /auth /profile] as ROUTER
+    component [RedisCacheService\n@cached decorator  TTL: 5 min] as CACHE_SVC
+    component [Strategy Pattern\nLatestSort | RelevanceSort] as STRATEGY
+    component [WebSocket Handler\n/ws/notifications] as WS
+  }
+
+  rectangle "Background Write Path (async, non-blocking)" #LightYellow {
+    component [asyncio.Task\nrss_refresh_loop / ingestion_loop] as WORKER
+    component [AggregatorFacade\nfetch_all_opportunities()] as FACADE
+    component [RSSAdapter\n(Feedparser XML)] as RSS
+    component [AdzunaAdapter\n(REST JSON)] as ADZ
+    component [JoobleAdapter\n(REST JSON)] as JOO
+    component [Sentence-Transformers\nall-MiniLM-L6-v2  dim-384] as EMB
+    component [Notification Publisher\nRedis PUBLISH] as NOTIF
+  }
+
+  rectangle "Persistence Layer" #LightSalmon {
+    database [Redis\nCache Store + Pub/Sub Broker\nPort: 6379] as REDIS
+    database [PostgreSQL + pgvector\nrss_items / users / bookmarks\nHNSW embedding index  Port: 5432] as PG
+  }
+}
+
+cloud "External Services" #PaleGreen {
+  [RSS Feeds\n(XML)] as EXT_RSS
+  [Adzuna REST API\n(JSON)] as EXT_ADZ
+  [Jooble REST API\n(JSON)] as EXT_JOO
+  [Google Gemini API\n(resume parsing)] as GEMINI
+}
+
+' --- READ PATH ---
+S --> JWT : HTTPS Request (JWT Bearer)
+JWT --> ROUTER : validated user_id
+ROUTER --> CACHE_SVC : check cache key
+CACHE_SVC --> REDIS : GET feed:{key}
+REDIS --> CACHE_SVC : HIT->cached JSON  MISS->nil
+CACHE_SVC --> STRATEGY : on MISS: apply sort strategy
+STRATEGY --> PG : SQL + pgvector cosine-similarity
+PG --> STRATEGY : rows
+STRATEGY --> CACHE_SVC : result set
+CACHE_SVC --> REDIS : SET feed:{key} EX 300
+CACHE_SVC --> ROUTER : List[NormalizedRssItem]
+ROUTER --> S : HTTP 200 JSON  (LT 5 ms cached)
+
+' --- WEBSOCKET NOTIFICATION PATH ---
+S --> WS : WebSocket connect /ws/notifications
+WS --> REDIS : SUBSCRIBE notifications:{user_id}
+REDIS --> WS : event push
+WS --> S : real-time notification
+
+' --- BACKGROUND WRITE PATH (runs every 30 min) ---
+WORKER --> FACADE : fetch_all_opportunities()
+FACADE --> RSS : fetch()
+FACADE --> ADZ : fetch()
+FACADE --> JOO : fetch()
+RSS --> EXT_RSS : HTTP GET (non-blocking)
+ADZ --> EXT_ADZ : HTTP GET (non-blocking)
+JOO --> EXT_JOO : HTTP GET (non-blocking)
+FACADE --> WORKER : deduplicated items
+WORKER --> PG : INSERT ON CONFLICT DO NOTHING
+WORKER --> EMB : encode(title + description)
+EMB --> PG : UPDATE embedding vector
+WORKER --> REDIS : DEL feed:* (invalidate cache)
+WORKER --> NOTIF
+NOTIF --> REDIS : PUBLISH notifications:{user_id}
+
+' --- RESUME UPLOAD PATH ---
+ROUTER --> GEMINI : POST /profile/upload-resume\n(PDF text -> structured JSON)
+GEMINI --> ROUTER : skills, education, experience
+
+note bottom of WORKER
+  asyncio.Task runs every 30 min.
+  Completely decoupled from read path.
+  API stays at LT 5 ms during ingestion.
+end note
+
+note right of REDIS
+  Dual-role: Cache Store + Pub/Sub Broker.
+  Falls back to PostgreSQL if unavailable.
+end note
+
+@enduml

@@ -1,0 +1,64 @@
+@startuml arch_b_component
+skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #336699
+skinparam ArrowThickness 2
+skinparam rectangleBorderColor #336699
+
+title Architecture B — N-Tier Layered Architecture\nComponent & Layer Diagram
+
+actor "Student (Browser)" as S
+
+rectangle "N-Tier Layered Architecture" {
+
+  rectangle "Layer 1: Presentation Layer" #LightBlue {
+    component [FastAPI Router\n/api/feeds/rss] as ROUTER
+  }
+
+  rectangle "Layer 2: Business Logic Layer" #LightYellow {
+    component [AggregatorFacade\nfetch_all_opportunities()] as FACADE
+    component [RSSAdapter\nFeedparser XML] as RSS
+    component [AdzunaAdapter\nAdzuna REST API] as ADZ
+    component [JoobleAdapter\nJooble REST API] as JOO
+  }
+
+  rectangle "Layer 3: Data Access Layer" #LightSalmon {
+    component [SQLAlchemy ORM\nRepository] as ORM
+  }
+
+  rectangle "Layer 4: Data Storage Layer" #Wheat {
+    database [PostgreSQL\nrss_items table] as DB
+  }
+}
+
+cloud "External Services" #PaleGreen {
+  [RSS Feeds\n(Internshala / HackerEarth\n/ DevPost XML)] as EXT_RSS
+  [Adzuna REST API\n(JSON)] as EXT_ADZ
+  [Jooble REST API\n(JSON)] as EXT_JOO
+}
+
+S --> ROUTER : HTTP GET\n(synchronous)
+ROUTER --> FACADE : fetch_all_opportunities()
+FACADE --> RSS
+FACADE --> ADZ
+FACADE --> JOO
+RSS --> EXT_RSS : HTTP GET (blocking ~1000ms)
+ADZ --> EXT_ADZ : HTTP GET (blocking ~400ms)
+JOO --> EXT_JOO : HTTP GET (blocking ~500ms)
+FACADE --> ORM : insert_all()+select()
+ORM --> DB : SQL INSERT + SELECT
+DB --> ORM : rows
+ORM --> FACADE : List[NormalizedRssItem]
+FACADE --> ROUTER : merged result
+ROUTER --> S : HTTP 200 JSON\n(~1500–2600ms total)
+
+note bottom of FACADE
+  All adapter calls are SEQUENTIAL
+  and BLOCKING within a single
+  HTTP request lifecycle.
+  Total latency = sum of all external
+  API response times.
+end note
+
+@enduml

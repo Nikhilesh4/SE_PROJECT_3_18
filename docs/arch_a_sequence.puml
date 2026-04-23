@@ -1,0 +1,101 @@
+@startuml arch_a_sequence
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam sequenceParticipantBorderColor #336699
+skinparam sequenceLifeLineBorderColor #336699
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+
+title Architecture A — Hybrid Event-Driven Cache-Aside\n(Implemented Architecture — READ PATH vs WRITE PATH)
+
+== READ PATH: User Request (< 5 ms on cache hit) ==
+
+actor "Student\n(Browser)" as S
+participant "JWT Middleware\n(FastAPI)" as JWT #LightCyan
+participant "Feed Router\n/api/feeds/rss" as ROUTER #LightBlue
+participant "RedisCacheService\n(@cached decorator)" as REDIS #LightPink
+database "Redis\n(Cache Store)" as REDIS_DB #Pink
+database "PostgreSQL\n(rss_items)" as PG #Wheat
+
+S -> JWT : GET /api/feeds/rss?category=internship
+activate JWT
+JWT -> JWT : verify JWT signature\n(~1 ms, no DB call)
+JWT -> ROUTER : forward request
+activate ROUTER
+ROUTER -> REDIS : cache_get("feed:internship:latest:1")
+activate REDIS
+REDIS -> REDIS_DB : GET feed:internship:latest:1
+
+alt Cache HIT (most requests — ~280 req/s)
+  REDIS_DB --> REDIS : cached JSON payload
+  REDIS --> ROUTER : List[NormalizedRssItem]\n(~2-5 ms total)
+  ROUTER --> S : HTTP 200 JSON\n(✅ < 5 ms — NFR-1 satisfied)
+else Cache MISS (cold start / after invalidation)
+  REDIS_DB --> REDIS : nil
+  deactivate REDIS
+  ROUTER -> PG : SELECT * FROM rss_items\nWHERE category=?\nORDER BY published_at DESC\nLIMIT ? OFFSET ?
+  activate PG
+  PG --> ROUTER : rows (~50-90 ms)
+  deactivate PG
+  ROUTER -> REDIS : cache_set("feed:internship:latest:1", JSON, TTL=300s)
+  activate REDIS
+  REDIS -> REDIS_DB : SET feed:internship:latest:1 EX 300
+  REDIS_DB --> REDIS : OK
+  deactivate REDIS
+  ROUTER --> S : HTTP 200 JSON\n(~55-95 ms — still within NFR-1)
+end
+
+deactivate ROUTER
+deactivate JWT
+
+== WRITE PATH: Background Ingestion Worker (async, independent) ==
+
+participant "asyncio.Task\n(ingestion_loop)" as WORKER #LightGreen
+participant "AggregatorFacade\nfetch_all_opportunities()" as FACADE #LightYellow
+participant "RSSAdapter" as RSS #LightGreen
+participant "AdzunaAdapter" as ADZ #LightGreen
+participant "JoobleAdapter" as JOO #LightGreen
+participant "Sentence-Transformers\n(Embedding Model)" as EMB #Lavender
+
+note over WORKER : Runs every 30 min as asyncio.Task\nCOMPLETELY INDEPENDENT of read path\nDoes NOT block API responses
+
+WORKER -> FACADE : fetch_all_opportunities()
+activate FACADE
+FACADE -> RSS : fetch_opportunities()
+activate RSS
+RSS --> FACADE : List[NormalizedRssItem]
+deactivate RSS
+FACADE -> ADZ : fetch_opportunities()
+activate ADZ
+ADZ --> FACADE : List[NormalizedRssItem]
+deactivate ADZ
+FACADE -> JOO : fetch_opportunities()
+activate JOO
+JOO --> FACADE : List[NormalizedRssItem]
+note right of JOO : ⚠️ If Jooble fails,\nFACADE catches exception,\nlogs it, and CONTINUES.\nFault-isolated!
+deactivate JOO
+FACADE --> WORKER : deduplicated items
+deactivate FACADE
+
+WORKER -> PG : INSERT INTO rss_items\nON CONFLICT DO NOTHING
+activate PG
+PG --> WORKER : OK
+deactivate PG
+
+WORKER -> EMB : encode(title + description)
+activate EMB
+EMB --> WORKER : vector[384]
+deactivate EMB
+
+WORKER -> PG : UPDATE rss_items SET embedding=?
+activate PG
+PG --> WORKER : OK
+deactivate PG
+
+WORKER -> REDIS_DB : DEL feed:* (cache invalidation)
+REDIS_DB --> WORKER : OK (next read will re-populate)
+
+WORKER -> REDIS_DB : PUBLISH notifications:{user_id}\n{opportunity_payload}
+REDIS_DB --> WORKER : subscriber count
+
+@enduml
