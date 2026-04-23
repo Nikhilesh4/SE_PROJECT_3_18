@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "endpoint": "http://localhost:8000/api/feeds/rss?limit=20&active_only=true",
+    "n_requests": 50,
+    "warmup": 5,
+    "timestamp": "2026-04-23T13:59:05Z"
+  },
+  "scenario_a_with_redis": {
+    "scenario": "Scenario A \u2014 WITH Redis Cache (Cache-Aside architecture)",
+    "n_requests": 50,
+    "success": 50,
+    "failed": 0,
+    "mean_ms": 3.47,
+    "min_ms": 2.56,
+    "p50_ms": 3.46,
+    "p95_ms": 4.31,
+    "p99_ms": 4.84,
+    "max_ms": 4.84,
+    "throughput_rps": 279.96
+  },
+  "scenario_b_no_cache": {
+    "scenario": "Scenario B \u2014 NO Redis Cache (PostgreSQL direct, flush per request)",
+    "n_requests": 50,
+    "success": 50,
+    "failed": 0,
+    "mean_ms": 215.85,
+    "min_ms": 201.38,
+    "p50_ms": 209.12,
+    "p95_ms": 294.89,
+    "p99_ms": 358.77,
+    "max_ms": 358.77,
+    "throughput_rps": 4.59
+  }
+}

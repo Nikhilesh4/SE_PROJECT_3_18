@@ -1,0 +1,70 @@
+@startuml arch_b_sequence
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam sequenceParticipantBorderColor #336699
+skinparam sequenceLifeLineBorderColor #336699
+skinparam sequenceBoxBackgroundColor #EEF3FF
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+
+title Architecture B — N-Tier Synchronous Flow\n(Synchronous Layered Architecture Pattern)
+
+actor "Student\n(Browser)" as S
+participant "Presentation Layer\n(FastAPI Router)" as P #LightBlue
+participant "Business Logic Layer\n(AggregatorFacade)" as B #LightYellow
+participant "RSSAdapter\n(Feedparser XML)" as RSS #LightGreen
+participant "AdzunaAdapter\n(REST API)" as ADZ #LightGreen
+participant "JoobleAdapter\n(REST API)" as JOO #LightGreen
+participant "Data Access Layer\n(SQLAlchemy ORM)" as DAL #LightSalmon
+database "PostgreSQL\n(Storage Layer)" as DB #Wheat
+
+S  -> P   : GET /api/feeds/rss?category=internship
+activate P
+P  -> B   : fetch_all_opportunities()
+activate B
+
+note right of B : All external calls happen\nSYNCHRONOUSLY within the\nsame HTTP request lifecycle
+
+B  -> RSS : fetch_opportunities()
+activate RSS
+RSS --> B : List[NormalizedRssItem]\n(~800–1000 ms)
+deactivate RSS
+
+B  -> ADZ : fetch_opportunities()
+activate ADZ
+ADZ --> B : List[NormalizedRssItem]\n(~200–500 ms)
+deactivate ADZ
+
+B  -> JOO : fetch_opportunities()
+activate JOO
+JOO --> B : List[NormalizedRssItem]\n(~300–600 ms)
+deactivate JOO
+
+B  -> B   : deduplicate(items)\n[in-memory set() pass]
+
+B  -> DAL : insert_all(items)
+activate DAL
+DAL -> DB : INSERT INTO rss_items\nON CONFLICT DO NOTHING
+activate DB
+DB --> DAL: OK
+deactivate DB
+deactivate DAL
+
+B  -> DAL : select(category, page, limit)
+activate DAL
+DAL -> DB : SELECT * FROM rss_items\nWHERE category = ?\nORDER BY published_at DESC\nLIMIT ? OFFSET ?
+activate DB
+DB --> DAL: rows
+deactivate DB
+DAL --> B : List[NormalizedRssItem]
+deactivate DAL
+
+B  --> P  : merged + filtered result
+deactivate B
+
+P  --> S  : HTTP 200 JSON\n(Total: ~1500–2600 ms)
+deactivate P
+
+note over S, DB : ⚠️  PROBLEM: If ANY external API hangs,\nthe student waits the full timeout duration.\nJooble timeout (15s) = blank page for student.
+
+@enduml
