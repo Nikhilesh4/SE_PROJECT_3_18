@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearToken, getToken } from "@/lib/authSession";
+import { clearProfileCache } from "@/lib/useProfile";
 
 export default function Navbar() {
     const router = useRouter();
@@ -21,7 +22,8 @@ export default function Navbar() {
     }, []);
 
     const handleLogout = () => {
-        clearToken();
+        clearProfileCache();   // wipe in-memory profile so next account starts fresh
+        clearToken();          // removes JWT + localStorage feed cache
         setIsLoggedIn(false);
         router.push("/login");
     };

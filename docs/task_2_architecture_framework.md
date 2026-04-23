@@ -44,29 +44,343 @@ Each stakeholder has distinct concerns about the system that must be addressed b
 
 ---
 
-### 1.3 Architecture Viewpoints
+### 1.3 Architecture Viewpoints (Kruchten's 4+1 View Model)
 
-Following IEEE 42010, the following **viewpoints** are defined. Each viewpoint frames a set of stakeholder concerns and specifies the conventions for the corresponding view.
+Following the **4+1 View Model** (Kruchten, 1995), five complementary viewpoints are defined to address the concerns of all stakeholders. The **Scenarios view** acts as the glue that ties the other four views together.
 
-| Viewpoint ID | Viewpoint Name          | Addressed Concerns | Primary Stakeholders |
-|--------------|-------------------------|--------------------|----------------------|
-| VP-1 | **Functional / Logical Viewpoint** | What the system does; its key components and responsibilities. | SH1, SH2, SH3, SH4 |
-| VP-2 | **Information / Data Viewpoint** | How data is structured, stored, and flows through the system. | SH1, SH3, SH6 |
-| VP-3 | **Deployment / Infrastructure Viewpoint** | How the system is deployed; the runtime environment and infrastructure. | SH3, SH6, SH5 |
-| VP-4 | **Behavioral / Process Viewpoint** | How the system behaves over time; key workflows and interactions. | SH1, SH2, SH3 |
-| VP-5 | **Performance & Caching Viewpoint** | How latency, throughput, and scalability requirements are met. | SH1, SH3, SH4, SH6 |
+| View | Perspective | Addressed Concerns | Primary Stakeholders |
+|------|-------------|--------------------|----------------------|
+| **Scenarios (Use Case View)** | Putting it all together | System consistency, end-to-end flows, and key use cases that validate the architecture. | All Stakeholders |
+| **Logical View** | End-user functionality | Functional requirements; key classes, interfaces, and their relationships. | SH1, SH2, SH3, SH4 |
+| **Process View** | Integrators / Performance | Runtime concurrency, performance, scalability, and availability concerns. | SH3, SH5, SH6 |
+| **Development View** | Developers / Programmers | Static software organization — packages, modules, layers, and build structure. | SH3, SH4 |
+| **Physical View** | System engineers | Hardware topology, deployment environment, and physical communication links. | SH3, SH6 |
 
 ---
 
 ### 1.4 Architecture Views
 
-Each view corresponds to one viewpoint and provides a concrete description of the architecture from that perspective.
+Each view corresponds to one viewpoint from the 4+1 model and provides a concrete, multi-dimensional description of the UniCompass architecture.
 
 ---
 
-#### View 1 — Functional / Logical View (VP-1)
+#### 1.4.1 Scenarios — Use Case View
 
-This view describes the major logical subsystems of UniCompass and their responsibilities:
+> **Perspective:** All stakeholders. Scenarios illustrate how the architecture serves real user needs and are used to validate the other four views.
+
+**Use Case Diagram (PlantUML):**
+
+```plantuml
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor LightYellow
+  BorderColor DarkOrange
+}
+
+actor "Undergraduate Student" as Student
+actor "Research Aspirant" as Researcher
+actor "Teaching Assistant / Admin" as Admin
+
+rectangle "UniCompass System" {
+  usecase "UC1: Register / Login" as UC1
+  usecase "UC2: Upload PDF Resume" as UC2
+  usecase "UC3: View AI-Extracted Profile\n(skills, education, interests)" as UC3
+  usecase "UC4: Browse Discovery Feed" as UC4
+  usecase "UC5: Filter Feed by Skills / Category" as UC5
+  usecase "UC6: Bookmark an Opportunity" as UC6
+  usecase "UC7: View Research Opportunities" as UC7
+  usecase "UC8: Trigger Manual Feed Refresh" as UC8
+}
+
+Student --> UC1
+Student --> UC2
+Student --> UC3
+Student --> UC4
+Student --> UC5
+Student --> UC6
+
+Researcher --> UC1
+Researcher --> UC4
+Researcher --> UC7
+
+Admin --> UC8
+@enduml
+```
+
+---
+
+#### 1.4.2 Logical View
+
+> **Perspective:** End-user functionality. Describes the key classes, interfaces, and their relationships that implement the system's functional requirements.
+
+**Class Diagram (PlantUML):**
+
+```plantuml
+@startuml
+skinparam classAttributeIconSize 0
+
+package "app.routers" {
+  class AuthRouter {
+    + register()
+    + login()
+    + get_current_user()
+  }
+  class FeedsRouter {
+    + list_rss_opportunities()
+    + get_rss_item()
+    + rss_manual_refresh()
+  }
+  class ProfileRouter {
+    + upload_resume()
+    + get_my_profile()
+  }
+}
+
+package "app.services" {
+  interface FeedFetchStrategy {
+    + execute(category, active_only,\n  resolved_limit, offset, skill_set)
+  }
+  class RelevanceFetchStrategy {
+    + execute()
+  }
+  class DefaultFetchStrategy {
+    + execute()
+  }
+  class RssCacheService {
+    + get_cached_feed()
+    + get_cache_status()
+  }
+  class ResumeProfileService {
+    + process_resume_upload()
+    + get_profile()
+    - _to_profile_out()
+  }
+  class RedisCache {
+    + get(key)
+    + set(key, value, ttl)
+    + delete(key)
+  }
+}
+
+package "app.services.adapters" {
+  class PDFExtractor {
+    + extract(pdf_bytes) : str
+  }
+  class AIProfileAdapter {
+    + structure(resume_text)
+    - _call_groq()
+    - _call_gemini()
+    - _normalize_payload()
+  }
+}
+
+package "app.repositories" {
+  class ProfileRepository {
+    + upsert_profile()
+    + get_by_user_id()
+  }
+}
+
+FeedFetchStrategy <|.. RelevanceFetchStrategy
+FeedFetchStrategy <|.. DefaultFetchStrategy
+
+FeedsRouter --> FeedFetchStrategy
+FeedsRouter --> RedisCache
+RelevanceFetchStrategy --> RssCacheService
+DefaultFetchStrategy --> RssCacheService
+RssCacheService --> RedisCache
+
+ProfileRouter --> ResumeProfileService
+ResumeProfileService --> PDFExtractor
+ResumeProfileService --> AIProfileAdapter
+ResumeProfileService --> ProfileRepository
+ResumeProfileService --> RedisCache
+@enduml
+```
+
+---
+
+#### 1.4.3 Process View
+
+> **Perspective:** Integrators / Performance. Focuses on runtime concurrency, system interactions, and the performance-critical personalized feed fetch flow.
+
+**Sequence Diagram — Personalized Feed Fetch (PlantUML):**
+
+```plantuml
+@startuml
+autonnumber
+actor User
+participant "Next.js UI" as UI
+participant "Next.js API Route\n(Facade)" as Gateway
+participant "FastAPI Router\n/api/feeds/rss" as API
+participant "RelevanceFetch\nStrategy" as Strategy
+database "Redis" as Redis
+database "PostgreSQL" as DB
+
+User -> UI : Browse feed with skill profile
+UI -> Gateway : GET /api/feeds/rss?skills=python,ml
+Gateway -> API : Forward request + JWT
+
+API -> Redis : GET feed:{category}:{skills_hash}
+alt Cache HIT (warm request ~3ms)
+  Redis -> API : Cached JSON payload
+  API -> Gateway : 200 OK (from_cache=true)
+else Cache MISS (cold request ~200ms)
+  API -> API : Parse & normalise skills
+  API -> API : Instantiate RelevanceFetchStrategy
+  API -> Strategy : execute(skill_set, ...)
+  Strategy -> DB : SELECT * FROM rss_items\nWHERE active=true LIMIT 2000
+  DB -> Strategy : item list
+  Strategy -> Strategy : Score each item\n(tags +4, title +2, summary +1)
+  Strategy -> Strategy : Sort DESC by score,\nthen paginate
+  Strategy -> API : RssAggregationResponse
+  API -> Redis : SET feed:key (TTL 300s)
+  API -> Gateway : 200 OK (from_cache=false)
+end
+
+Gateway -> UI : JSON Response
+UI -> User : Render ranked feed
+@enduml
+```
+
+---
+
+#### 1.4.4 Development View
+
+> **Perspective:** Developers / Programmers. Describes the static organization of software into packages, layers, and deployable modules.
+
+**Component Diagram (PlantUML):**
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+
+package "Frontend (Next.js)" {
+  [UI Pages & Components] as UIPages
+  [Next.js API Routes\n(Facade / Gateway)] as NextAPI
+  UIPages --> NextAPI : fetch()
+}
+
+package "Backend (FastAPI / Uvicorn)" {
+  package "Routers" {
+    [AuthRouter] as AuthR
+    [FeedsRouter] as FeedR
+    [ProfileRouter] as ProfR
+  }
+  package "Services" {
+    [ResumeProfileService] as RPS
+    [RssCacheService] as RCS
+    [RedisCache] as RC
+  }
+  package "Adapters" {
+    [PDFExtractor] as PDF
+    [AIProfileAdapter] as AIA
+  }
+  package "Repositories" {
+    [ProfileRepository] as PR
+  }
+  package "Workers" {
+    [rss_refresh_loop] as RRL
+    [ingestion_loop] as IL
+  }
+
+  AuthR --> RC
+  FeedR --> RCS
+  FeedR --> RC
+  ProfR --> RPS
+  RPS --> PDF
+  RPS --> AIA
+  RPS --> PR
+  RPS --> RC
+  RCS --> RC
+  RRL --> RCS
+  IL --> RC
+}
+
+database "PostgreSQL\n(+ pgvector)" as PG
+database "Redis 7" as RD
+
+cloud "External Services" {
+  [Gemini / Groq AI API] as AI
+  [RSS Feeds\n(Internshala, HackerEarth,\nDevPost)] as RSS
+}
+
+NextAPI --> FeedR : HTTP
+NextAPI --> AuthR : HTTP
+NextAPI --> ProfR : HTTP
+RC --> RD : redis-py
+PR --> PG : SQLAlchemy
+AIA --> AI : HTTPS
+RRL --> RSS : feedparser
+@enduml
+```
+
+---
+
+#### 1.4.5 Physical View
+
+> **Perspective:** System engineers. Describes the mapping of software components onto hardware/container nodes and the communication protocols between them.
+
+**Deployment Diagram (PlantUML):**
+
+```plantuml
+@startuml
+skinparam node {
+  BackgroundColor LightBlue
+  BorderColor Navy
+}
+
+node "User's Browser" as Browser {
+  artifact "Next.js Client Bundle\n(React, CSS)" as ClientJS
+}
+
+node "Docker Host" as DockerHost {
+
+  node "frontend container\n(Port 3001)" as FEC {
+    artifact "Next.js Server\n(SSR + API Routes)" as NextServer
+  }
+
+  node "backend container\n(Port 8000)" as BEC {
+    artifact "FastAPI / Uvicorn" as FastAPI
+    artifact "rss_refresh_loop\n(asyncio task)" as Worker1
+    artifact "ingestion_loop\n(asyncio task)" as Worker2
+  }
+
+  node "postgres container\n(Port 5432)" as PGNODE {
+    database "PostgreSQL 16\n+ pgvector" as PG
+  }
+
+  node "redis container\n(Port 6379)" as RDNODE {
+    database "Redis 7\n(Cache + Pub/Sub)" as RD
+  }
+
+  node "rss-bridge container\n(Port 3000)" as RSSB {
+    artifact "RSS-Bridge\n(XML bridge)" as RSSBridge
+  }
+}
+
+cloud "External Cloud Services" {
+  [Gemini / Groq AI API] as AICloud
+  [Public RSS Sources] as RSSCloud
+}
+
+Browser -- FEC : HTTPS (HTTP/1.1)
+FEC -- BEC : HTTP (REST + WebSocket)
+BEC -- PGNODE : TCP 5432 (SQLAlchemy)
+BEC -- RDNODE : TCP 6379 (redis-py)
+BEC -- RSSB : HTTP
+BEC -- AICloud : HTTPS
+Worker1 -- RSSCloud : HTTPS (feedparser)
+@enduml
+```
+
+---
+
+## Part 2: Architecture Decision Records (ADRs)
+
+> All ADRs follow the **Nygard ADR Template** as described at: https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
