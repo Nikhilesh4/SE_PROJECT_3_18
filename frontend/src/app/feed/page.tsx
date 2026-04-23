@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFeed } from "@/lib/useFeed";
 import { useAuth } from "@/lib/useAuth";
+import { useProfile } from "@/lib/useProfile";
 import OpportunityCard from "./OpportunityCard";
 import SourceStatusPanel from "./SourceStatusPanel";
 
@@ -47,21 +49,39 @@ function SkeletonCard() {
     );
 }
 
-export default function FeedPage() {
+function FeedPageInner() {
+    const searchParams = useSearchParams();
+    const defaultSort = searchParams.get("sort") === "relevant";
+
     const { isAuthenticated, checking } = useAuth();
+    const { profile, loading: profileLoading, hasProfile } = useProfile();
+
     const [selectedCategory, setSelectedCategory] = useState("");
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
+    const [relevanceMode, setRelevanceMode] = useState(defaultSort);
 
     const offset = (page - 1) * ITEMS_PER_PAGE;
+
+    // Build skill set for relevance mode — combine skills + interests
+    // Both skills AND interests are used so matching is broad
+    const userSkills = useMemo<string[]>(() => {
+        if (!relevanceMode || !profile) return [];
+        return [...(profile.skills ?? []), ...(profile.interests ?? [])];
+    }, [relevanceMode, profile]);
 
     const { data, loading, error, refetch } = useFeed({
         category: selectedCategory || undefined,
         limitPerFeed: ITEMS_PER_PAGE,
         offset,
+        // When relevanceMode is on, backend fetches ALL items, scores them,
+        // and returns globally-ranked results paginated server-side.
+        skills: userSkills.length > 0 ? userSkills : undefined,
     });
 
-    // Client-side search filter on top of category filter
+    // Client-side search filter — applied on top of ranked results.
+    // Note: in relevance mode the ranking is global (all DB items scored),
+    // so search here filters within the current ranked page.
     const filtered = useMemo(() => {
         if (!data) return [];
         const q = search.trim().toLowerCase();
@@ -83,7 +103,14 @@ export default function FeedPage() {
         setPage(1);
     };
 
-    // Auth guard — show spinner while checking
+    const handleRelevanceToggle = () => {
+        if (!hasProfile && !relevanceMode) return;
+        setRelevanceMode((v) => !v);
+        setPage(1);   // always reset to page 1 when switching modes
+        setSearch(""); // clear search so ranking is immediately visible
+    };
+
+    // Auth guard
     if (checking || !isAuthenticated) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -95,6 +122,12 @@ export default function FeedPage() {
         );
     }
 
+    const relevanceBtnTitle = !hasProfile
+        ? "Upload a resume first to enable relevance ranking"
+        : relevanceMode
+        ? "Showing results ranked by your skills — click to switch to default order"
+        : "Click to rank results by your extracted skills and interests";
+
     return (
         <div className="min-h-screen bg-slate-50 relative overflow-hidden">
             {/* Ambient background */}
@@ -104,32 +137,42 @@ export default function FeedPage() {
             </div>
 
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 pt-24">
-                {/* Page header */}
+                {/* ── Page header ──────────────────────────────────────────── */}
                 <div className="mb-8">
-                    {/* Data-source indicator — tells TA/dev where this response came from */}
+                    {/* Badges row */}
                     <div className="flex items-center gap-2 mb-4 flex-wrap">
-                        {/* Always-on badge */}
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium">
                             <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
                             Live RSS Aggregation
                         </div>
 
-                        {/* Dynamic cache-origin badge — only shown once data arrives */}
+                        {/* Cache origin badge */}
                         {data && (
                             <div
-                                title={data.from_cache
-                                    ? "Response served from Redis cache (fast path — no DB query)"
-                                    : "Response fetched fresh from PostgreSQL (cache miss)"}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all ${data.from_cache
+                                title={
+                                    data.from_cache
+                                        ? "Response served from Redis cache (fast path — no DB query)"
+                                        : "Response fetched fresh from PostgreSQL (cache miss)"
+                                }
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all ${
+                                    data.from_cache
                                         ? "bg-amber-50 border-amber-300 text-amber-700"
                                         : "bg-emerald-50 border-emerald-300 text-emerald-700"
-                                    }`}
+                                }`}
                             >
                                 <span>{data.from_cache ? "⚡" : "🗄️"}</span>
                                 <span>{data.from_cache ? "Redis Cache" : "PostgreSQL DB"}</span>
                             </div>
                         )}
+
+                        {/* Relevance mode badge */}
+                        {relevanceMode && hasProfile && (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border bg-violet-50 border-violet-300 text-violet-700 text-xs font-semibold">
+                                🎯 Ranked by your skills
+                            </div>
+                        )}
                     </div>
+
                     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                         <div>
                             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
@@ -142,26 +185,74 @@ export default function FeedPage() {
                             </p>
                         </div>
 
-                        {/* Refresh button */}
-                        <button
-                            onClick={refetch}
-                            disabled={loading}
-                            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* ── Relevance toggle ─── */}
+                            <button
+                                id="relevance-toggle"
+                                onClick={handleRelevanceToggle}
+                                disabled={!hasProfile || profileLoading}
+                                title={relevanceBtnTitle}
+                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                                    relevanceMode
+                                        ? "bg-violet-600 text-white border-violet-600 shadow-md shadow-violet-200"
+                                        : "bg-white text-slate-700 border-slate-300 hover:border-violet-300 hover:text-violet-700"
+                                }`}
                             >
-                                <path d="M21.5 2v6h-6" />
-                                <path d="M2.5 12A10 10 0 0 1 18.5 4.3L21.5 8" />
-                                <path d="M2.5 22v-6h6" />
-                                <path d="M21.5 12A10 10 0 0 1 5.5 19.7L2.5 16" />
-                            </svg>
-                            {loading ? "Fetching…" : "Refresh"}
-                        </button>
+                                🎯
+                                {profileLoading
+                                    ? "Loading profile…"
+                                    : relevanceMode
+                                    ? "Relevant to You ✓"
+                                    : hasProfile
+                                    ? "Sort by Relevance"
+                                    : "Upload Resume First"}
+                            </button>
+
+                            {/* Refresh button */}
+                            <button
+                                onClick={refetch}
+                                disabled={loading}
+                                className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <path d="M21.5 2v6h-6" />
+                                    <path d="M2.5 12A10 10 0 0 1 18.5 4.3L21.5 8" />
+                                    <path d="M2.5 22v-6h6" />
+                                    <path d="M21.5 12A10 10 0 0 1 5.5 19.7L2.5 16" />
+                                </svg>
+                                {loading ? "Fetching…" : "Refresh"}
+                            </button>
+                        </div>
                     </div>
+
+                    {/* Skills chip strip — only in relevance mode */}
+                    {relevanceMode && hasProfile && profile && profile.skills.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-1.5">
+                            <span className="text-xs text-slate-500 self-center mr-1">Matching on:</span>
+                            {[...profile.skills, ...profile.interests].slice(0, 12).map((s) => (
+                                <span
+                                    key={s}
+                                    className="px-2 py-0.5 rounded-md text-xs font-medium bg-violet-100 text-violet-700 border border-violet-200"
+                                >
+                                    {s}
+                                </span>
+                            ))}
+                            {(profile.skills.length + profile.interests.length) > 12 && (
+                                <span className="text-xs text-slate-400 self-center">
+                                    +{(profile.skills.length + profile.interests.length) - 12} more
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Search bar */}
@@ -169,8 +260,12 @@ export default function FeedPage() {
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                     >
                         <circle cx="11" cy="11" r="8" />
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -208,10 +303,11 @@ export default function FeedPage() {
                                     <button
                                         key={cat.value}
                                         onClick={() => handleCategoryChange(cat.value)}
-                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left ${isActive
-                                            ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-transparent"
-                                            }`}
+                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left ${
+                                            isActive
+                                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                                : "text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-transparent"
+                                        }`}
                                     >
                                         <span className="text-base">{cat.icon}</span>
                                         {cat.label}
@@ -219,6 +315,25 @@ export default function FeedPage() {
                                 );
                             })}
                         </div>
+
+                        {/* Profile snippet in sidebar */}
+                        {hasProfile && profile && (
+                            <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                                <p className="text-xs font-semibold text-violet-700 uppercase tracking-wider mb-2">
+                                    Your Skills
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                    {profile.skills.slice(0, 8).map((s) => (
+                                        <span key={s} className="px-2 py-0.5 rounded text-xs bg-white border border-violet-200 text-violet-700">
+                                            {s}
+                                        </span>
+                                    ))}
+                                    {profile.skills.length > 8 && (
+                                        <span className="text-xs text-violet-500">+{profile.skills.length - 8}</span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Source status panel */}
                         {data && <SourceStatusPanel sources={data.sources} />}
@@ -258,13 +373,28 @@ export default function FeedPage() {
                                 {/* Results count */}
                                 {data && (
                                     <p className="text-xs text-slate-500 mb-4">
-                                        Showing <span className="text-slate-800 font-medium">{filtered.length}</span>
-                                        {data.total_items !== filtered.length && (
-                                            <> of {data.total_items.toLocaleString()}</>
-                                        )}{" "}
-                                        results{selectedCategory && <> · <span className="text-indigo-700">{selectedCategory}</span></>}
-                                        {search && <> matching <span className="text-indigo-700">&ldquo;{search}&rdquo;</span></>}
-                                        {totalPages > 1 && <> · Page <span className="text-slate-800 font-medium">{page}</span> of {totalPages}</>}
+                                        {relevanceMode ? (
+                                            <>
+                                                🎯 Showing{" "}
+                                                <span className="text-slate-800 font-medium">{filtered.length}</span>
+                                                {" "}of{" "}
+                                                <span className="text-violet-700 font-medium">{data.total_items.toLocaleString()} total items</span>
+                                                {" "}— globally ranked by your skills
+                                                {selectedCategory && <> · <span className="text-indigo-700">{selectedCategory}</span></>}
+                                                {totalPages > 1 && <> · Page <span className="text-slate-800 font-medium">{page}</span> of {totalPages}</>}
+                                            </>
+                                        ) : (
+                                            <>
+                                                Showing <span className="text-slate-800 font-medium">{filtered.length}</span>
+                                                {data.total_items !== filtered.length && (
+                                                    <> of {data.total_items.toLocaleString()}</>
+                                                )}{" "}
+                                                results
+                                                {selectedCategory && <> · <span className="text-indigo-700">{selectedCategory}</span></>}
+                                                {search && <> matching <span className="text-indigo-700">&ldquo;{search}&rdquo;</span></>}
+                                                {totalPages > 1 && <> · Page <span className="text-slate-800 font-medium">{page}</span> of {totalPages}</>}
+                                            </>
+                                        )}
                                     </p>
                                 )}
 
@@ -272,11 +402,14 @@ export default function FeedPage() {
                                 {filtered.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                                         {filtered.map((item, idx) => (
-                                            <OpportunityCard key={item.guid ?? item.url ?? idx} item={item} />
+                                            <OpportunityCard
+                                                key={item.guid ?? item.url ?? idx}
+                                                item={item}
+                                                highlightSkills={relevanceMode ? userSkills : []}
+                                            />
                                         ))}
                                     </div>
                                 ) : (
-                                    // Empty state
                                     <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
                                         <div className="w-14 h-14 rounded-full bg-violet-500/10 flex items-center justify-center text-3xl">🔍</div>
                                         <div>
@@ -296,7 +429,7 @@ export default function FeedPage() {
                                     </div>
                                 )}
 
-                                {/* ── Pagination controls ── */}
+                                {/* Pagination */}
                                 {totalPages > 1 && (
                                     <div className="mt-8 flex items-center justify-center gap-3">
                                         <button
@@ -313,23 +446,19 @@ export default function FeedPage() {
                                         <div className="flex items-center gap-1">
                                             {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
                                                 let pageNum: number;
-                                                if (totalPages <= 7) {
-                                                    pageNum = i + 1;
-                                                } else if (page <= 4) {
-                                                    pageNum = i + 1;
-                                                } else if (page >= totalPages - 3) {
-                                                    pageNum = totalPages - 6 + i;
-                                                } else {
-                                                    pageNum = page - 3 + i;
-                                                }
+                                                if (totalPages <= 7) pageNum = i + 1;
+                                                else if (page <= 4) pageNum = i + 1;
+                                                else if (page >= totalPages - 3) pageNum = totalPages - 6 + i;
+                                                else pageNum = page - 3 + i;
                                                 return (
                                                     <button
                                                         key={pageNum}
                                                         onClick={() => setPage(pageNum)}
-                                                        className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${pageNum === page
-                                                            ? "bg-indigo-600 text-white shadow-sm"
-                                                            : "text-slate-700 hover:bg-slate-100 border border-transparent hover:border-slate-200"
-                                                            }`}
+                                                        className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
+                                                            pageNum === page
+                                                                ? "bg-indigo-600 text-white shadow-sm"
+                                                                : "text-slate-700 hover:bg-slate-100 border border-transparent hover:border-slate-200"
+                                                        }`}
                                                     >
                                                         {pageNum}
                                                     </button>
@@ -355,5 +484,19 @@ export default function FeedPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function FeedPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                    <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+            }
+        >
+            <FeedPageInner />
+        </Suspense>
     );
 }

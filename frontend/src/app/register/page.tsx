@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import { persistToken } from "@/lib/authSession";
+import { clearProfileCache } from "@/lib/useProfile";
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -31,8 +33,19 @@ export default function RegisterPage() {
                 password: formData.password,
             };
 
-            await api.post("/auth/register", payload);
-            router.push("/login?registered=true");
+            // Register — the API now returns an access_token directly
+            // so we can auto-login without a second round-trip.
+            const { data } = await api.post("/auth/register", payload);
+
+            if (data.access_token) {
+                // Clear any previous account's profile before logging in as new account
+                clearProfileCache();
+                persistToken(data.access_token);
+                // Send new users straight to Profile so they can upload resume
+                router.push("/profile?new=true");
+            } else {
+                router.push("/login?registered=true");
+            }
         } catch (err: unknown) {
             if (err && typeof err === "object" && "response" in err) {
                 const axiosErr = err as { response?: { data?: { detail?: string } } };
@@ -68,6 +81,24 @@ export default function RegisterPage() {
                     <p className="text-slate-600">
                         Join UniCompass to discover opportunities
                     </p>
+                </div>
+
+                {/* Steps indicator */}
+                <div className="flex items-center justify-center gap-3 mb-8">
+                    <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">1</div>
+                        <span className="text-sm font-medium text-indigo-700">Register</span>
+                    </div>
+                    <div className="h-px w-8 bg-slate-300" />
+                    <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold">2</div>
+                        <span className="text-sm text-slate-400">Upload Resume</span>
+                    </div>
+                    <div className="h-px w-8 bg-slate-300" />
+                    <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold">3</div>
+                        <span className="text-sm text-slate-400">Explore Feed</span>
+                    </div>
                 </div>
 
                 {/* Form Card */}
@@ -144,29 +175,14 @@ export default function RegisterPage() {
                         >
                             {loading ? (
                                 <span className="inline-flex items-center gap-2">
-                                    <svg
-                                        className="animate-spin h-4 w-4"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <circle
-                                            className="opacity-25"
-                                            cx="12"
-                                            cy="12"
-                                            r="10"
-                                            stroke="currentColor"
-                                            strokeWidth="4"
-                                            fill="none"
-                                        />
-                                        <path
-                                            className="opacity-75"
-                                            fill="currentColor"
-                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                                        />
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                     </svg>
                                     Creating account...
                                 </span>
                             ) : (
-                                "Create Account"
+                                "Create Account & Continue →"
                             )}
                         </button>
                     </form>

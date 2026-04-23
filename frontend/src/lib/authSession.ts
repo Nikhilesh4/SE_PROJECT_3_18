@@ -26,6 +26,8 @@ export function persistToken(token: string): void {
 export function clearToken(): void {
     if (typeof window === "undefined") return;
     localStorage.removeItem(TOKEN_KEY);
+    // Clear cached feed so the next user never sees another account's ranked results
+    localStorage.removeItem("unicompass_feed_cache");
     document.cookie = `${COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
     window.dispatchEvent(new Event("auth-changed"));
 }
