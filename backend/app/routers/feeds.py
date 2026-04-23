@@ -3,7 +3,8 @@
 Architecture Patterns Used:
   - Cache-Aside Pattern: Redis sits in front of PostgreSQL.
   - Facade Pattern: Single entry point for all feed operations.
-  - Strategy Pattern: Relevance scoring is injected when skills are provided.
+  - Strategy Pattern: FeedFetchStrategy (ABC) with RelevanceFetchStrategy
+    and DefaultFetchStrategy concrete implementations, selected at runtime.
 
 Architecture Tactics:
   - Performance: Redis TTL of 5 minutes reduces DB reads.
@@ -14,6 +15,7 @@ Architecture Tactics:
 from __future__ import annotations
 
 import hashlib
+from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Optional
 
@@ -77,6 +79,91 @@ def _build_skills_hash(skills: List[str]) -> str:
     return hashlib.md5(",".join(normalised).encode()).hexdigest()[:8]
 
 
+# ── Feed Fetch Strategies (Strategy Pattern) ─────────────────────────────────
+
+class FeedFetchStrategy(ABC):
+    """Abstract strategy for fetching and ordering feed items."""
+
+    @abstractmethod
+    def execute(
+        self,
+        *,
+        category: Optional[str],
+        active_only: bool,
+        resolved_limit: int,
+        offset: int,
+        skill_set: set[str],
+    ) -> "RssAggregationResponse":
+        ...
+
+
+class RelevanceFetchStrategy(FeedFetchStrategy):
+    """
+    Relevance mode: fetch ALL items, score each one against the user's skill
+    set, sort globally by score DESC, then apply pagination in Python.
+    This guarantees the most relevant items surface regardless of DB page.
+    """
+
+    def execute(
+        self,
+        *,
+        category: Optional[str],
+        active_only: bool,
+        resolved_limit: int,
+        offset: int,
+        skill_set: set[str],
+    ) -> "RssAggregationResponse":
+        all_result = cache_service.get_cached_feed(
+            category=category,
+            limit=2000,   # practical ceiling — DB rarely has more active items
+            offset=0,
+            active_only=active_only,
+        )
+
+        scored = [
+            (item, _relevance_score(item, skill_set))
+            for item in all_result.items
+        ]
+
+        scored.sort(
+            key=lambda t: (t[1], t[0].published_at or ""),
+            reverse=True,
+        )
+
+        all_items_sorted = [item for item, _ in scored]
+        total = len(all_items_sorted)
+        page_items = all_items_sorted[offset: offset + resolved_limit]
+
+        return RssAggregationResponse(
+            items=page_items,
+            sources=all_result.sources,
+            total_items=total,
+            fetched_at=all_result.fetched_at,
+        )
+
+
+class DefaultFetchStrategy(FeedFetchStrategy):
+    """
+    Default mode: standard paginated fetch from DB — no relevance scoring.
+    """
+
+    def execute(
+        self,
+        *,
+        category: Optional[str],
+        active_only: bool,
+        resolved_limit: int,
+        offset: int,
+        skill_set: set[str],  # unused — kept for interface uniformity
+    ) -> "RssAggregationResponse":
+        return cache_service.get_cached_feed(
+            category=category,
+            limit=resolved_limit,
+            offset=offset,
+            active_only=active_only,
+        )
+
+
 # ── Main Feed Endpoint ────────────────────────────────────────────────────────
 
 @router.get("/rss", response_model=RssAggregationResponse)
@@ -135,52 +222,18 @@ def list_rss_opportunities(
         response.from_cache = True
         return response
 
-    # ── Cache MISS ────────────────────────────────────────────────────────────
-    if skill_set:
-        # ── RELEVANCE MODE ────────────────────────────────────────────────────
-        # Fetch the ENTIRE dataset (no limit/offset) so we can score all items
-        # and surface the globally best matches regardless of page position.
-        all_result = cache_service.get_cached_feed(
-            category=category,
-            limit=2000,   # practical ceiling — DB rarely has more active items
-            offset=0,
-            active_only=active_only,
-        )
+    # ── Cache MISS: select and execute the appropriate strategy ─────────────
+    strategy: FeedFetchStrategy = (
+        RelevanceFetchStrategy() if skill_set else DefaultFetchStrategy()
+    )
 
-        # Score every item
-        scored = [
-            (item, _relevance_score(item, skill_set))
-            for item in all_result.items
-        ]
-
-        # Sort: highest score first; ties broken by most recent published_at
-        scored.sort(
-            key=lambda t: (t[1], t[0].published_at or ""),
-            reverse=True,
-        )
-
-        all_items_sorted = [item for item, _ in scored]
-        total = len(all_items_sorted)
-
-        # Apply pagination AFTER global sort
-        page_items = all_items_sorted[offset: offset + resolved_limit]
-
-        result = RssAggregationResponse(
-            items=page_items,
-            sources=all_result.sources,
-            total_items=total,
-            fetched_at=all_result.fetched_at,
-        )
-
-    else:
-        # ── DEFAULT MODE ──────────────────────────────────────────────────────
-        # Standard paginated fetch — no scoring needed.
-        result = cache_service.get_cached_feed(
-            category=category,
-            limit=resolved_limit,
-            offset=offset,
-            active_only=active_only,
-        )
+    result = strategy.execute(
+        category=category,
+        active_only=active_only,
+        resolved_limit=resolved_limit,
+        offset=offset,
+        skill_set=skill_set,
+    )
 
     # ── Store in Redis ────────────────────────────────────────────────────────
     # Serialise BEFORE setting from_cache so the flag is never baked into Redis.

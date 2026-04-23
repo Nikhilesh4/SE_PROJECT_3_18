@@ -51,7 +51,7 @@ Following IEEE 42010, the following **viewpoints** are defined. Each viewpoint f
 | Viewpoint ID | Viewpoint Name          | Addressed Concerns | Primary Stakeholders |
 |--------------|-------------------------|--------------------|----------------------|
 | VP-1 | **Functional / Logical Viewpoint** | What the system does; its key components and responsibilities. | SH1, SH2, SH3, SH4 |
-| VP-2 | **Information / Data Viewpoint** | How data is structured, stored, and flows through the system. | SH1, SH3, SH6 |
+| VP-2 | **Information / Data Viewpoint** | How data is structured, stored, and flows through the system. |  SH3, SH6 |
 | VP-3 | **Deployment / Infrastructure Viewpoint** | How the system is deployed; the runtime environment and infrastructure. | SH3, SH6, SH5 |
 | VP-4 | **Behavioral / Process Viewpoint** | How the system behaves over time; key workflows and interactions. | SH1, SH2, SH3 |
 | VP-5 | **Performance & Caching Viewpoint** | How latency, throughput, and scalability requirements are met. | SH1, SH3, SH4, SH6 |
