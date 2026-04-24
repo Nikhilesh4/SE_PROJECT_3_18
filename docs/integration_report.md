@@ -337,19 +337,37 @@ INFO  unicompass.redis_cache - Redis SET key='feed:None:true:50:0:a1b2c3d4' ttl=
 
 ---
 
-## 5. Patterns & Tactics Summary
+## 5. Patterns & Tactics In-Depth
 
-| Pattern / Tactic | Where Used in Task 7 |
-|-----------------|---------------------|
-| **Strategy Pattern** | `_relevance_score()` — swappable ranking algorithm in `feeds.py` |
-| **Facade Pattern** | Next.js `/api/feeds` proxies all requests; frontend never calls FastAPI directly |
-| **Singleton Pattern** | `redis_cache` (module-level instance); `_cachedProfile` in `useProfile.ts` |
-| **DTO Pattern** | `RegisterResponse` extends `UserResponse` with `access_token` |
-| **Cache-Aside Pattern** | Redis checked before every DB read in all endpoints |
-| **Performance Tactic** | Redis caching, localStorage client-side cache, skills hash key |
-| **Availability Tactic** | Redis failures silently fall back to DB (no 500 errors) |
-| **Modifiability Tactic** | Skills hash in cache key — personalised/generic caches are independent |
-| **Security Tactic** | Auth guard on profile + feed pages; JWT forwarded by proxy |
+This section details the architectural tactics and design patterns used specifically for the integration of the profile and discovery feed .
+
+### 5.1 Architectural Tactics
+
+**1. Performance Tactic: Maintain Multiple Copies (Caching)**
+- A Cache-Aside multi-layer caching strategy using Redis. We calculate an MD5 hash of the user's specific skills (extracted from the resume) to ensure personalised feeds are cached independently without colliding with generic feeds.
+
+**2. Availability Tactic: Fault Masking (Graceful Degradation)**
+- All Redis cache checks before database reads are wrapped in `try/except` blocks. If the Redis container goes down, the system silently catches the exception and falls back to querying PostgreSQL directly, ensuring no 500 errors.
+
+**3. Modifiability Tactic: Limit Possible Options (Parameterization)**
+- The `/api/feeds` endpoint now accepts a dynamic `skills` query parameter. This allows the backend to instantly alter the SQL sorting logic and caching keys without requiring structural code changes.
+
+**4. Security Tactic: Authenticate Actors**
+- Implemented Auth Guards on the `/profile` and `/feed` pages. Next.js proxies forward the JWT `Authorization` header to FastAPI to ensure only verified users can access their personalised feed and extracted skills.
+
+### 5.2 Software Design Patterns
+
+**1. Strategy Pattern (Behavioral)**
+- `_relevance_score()` in `feeds.py`.
+- We needed a way to rank feed items by relevance based on the skills extracted from the resume. We encapsulated the scoring logic into a swappable Strategy function. The router simply calls this strategy to sort items, completely decoupling the sorting logic from the route handler.
+
+**2. Facade Pattern (Structural)**
+- Next.js `/api/feeds` proxy.
+- The React frontend needs to talk to the backend securely. The Next.js `/api/` routes act as a Facade. The frontend simply calls `/api/feeds`, and the Next.js server handles the complexity of attaching JWT headers, formatting the new `skills` parameters, and communicating with the internal FastAPI backend, hiding this complexity from the client.
+
+**3. Singleton Pattern (Creational)**
+- `_cachedProfile` in `useProfile.ts` and `redis_cache` in the backend.
+- We used a module-level singleton cache (`_cachedProfile`) in the frontend so that any React component can access the user's parsed profile without triggering duplicate API calls.
 
 ---
 
