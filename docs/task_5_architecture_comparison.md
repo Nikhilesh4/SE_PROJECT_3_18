@@ -178,13 +178,14 @@ The Synchronous Layered architecture (B) is simulated by flushing Redis before e
 
 #### Measured Results
 
-| Latency Metric   | Cache Hit (Architecture A) | Cache Miss (Architecture A) | Alternative (Sync Monolith) |
-| ---------------- | -------------------------- | --------------------------- | --------------------------- |
-| **Mean**         | **3.47 ms**                | 215.85 ms                   | 90,700.42 ms                |
-| **p50 (Median)** | **3.46 ms**                | 209.12 ms                   | N/A                         |
-| **p95**          | **4.31 ms**                | 294.89 ms                   | N/A                         |
-| **p99**          | **4.84 ms**                | 358.77 ms                   | N/A                         |
-| **Max**          | **4.84 ms**                | 358.77 ms                   | 90,700.42 ms                |
+==========================================================================================
+Metric             | Cache Hit (Arch A)   | Cache Miss (Arch A)  | Sync Monolith (Arch B)
+------------------------------------------------------------------------------------------
+Mean               |              0.21 ms |             60.07 ms |          72557.55 ms
+p50 (Median)       |              0.19 ms |             60.19 ms |          71591.86 ms
+p95                |              0.30 ms |             85.11 ms |          78875.09 ms
+p99                |              0.79 ms |             85.11 ms |          78875.09 ms
+Max                |              0.79 ms |             85.11 ms |          78875.09 ms
 
 > Source: `docs/benchmark_results.json`
 
@@ -211,7 +212,7 @@ This proves that without asynchronous background ingestion, the application is f
 
 | Metric         | Cache Hit (Architecture A) | Cache Miss (Architecture A) | Alternative (Sync Monolith) |
 | -------------- | -------------------------- | --------------------------- | --------------------------- |
-| **Throughput** | **279.96 req/s**           | 4.59 req/s                  | 0.01 req/s                  |
+| **Throughput** | **279.94 req/s**           | 16.65 req/s                  | 0.01 req/s                  |
 
 > Source: `docs/benchmark_results.json`
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { NormalizedRssItem } from "@/lib/useFeed";
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -79,9 +79,14 @@ interface Props {
     item: NormalizedRssItem;
     /** When provided, skills are matched against tags, title, and summary */
     highlightSkills?: string[];
+    /** Whether this item is bookmarked by the current user */
+    isBookmarked?: boolean;
+    /** Callback to toggle bookmark state */
+    onToggleBookmark?: (itemId: number) => void;
 }
 
-export default function OpportunityCard({ item, highlightSkills = [] }: Props) {
+export default function OpportunityCard({ item, highlightSkills = [], isBookmarked = false, onToggleBookmark }: Props) {
+    const [animating, setAnimating] = useState(false);
     const cat = CATEGORY_STYLES[item.category] ?? {
         bg: "bg-slate-100", text: "text-slate-700", dot: "bg-slate-500",
     };
@@ -137,21 +142,54 @@ export default function OpportunityCard({ item, highlightSkills = [] }: Props) {
                     )}
                 </div>
 
-                {/* External link */}
-                <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Open original"
-                    onClick={(e) => e.stopPropagation()}
-                    className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                        <polyline points="15 3 21 3 21 9" />
-                        <line x1="10" y1="14" x2="21" y2="3" />
-                    </svg>
-                </a>
+                <div className="flex items-center gap-1">
+                    {/* Bookmark button */}
+                    {item.id != null && onToggleBookmark && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setAnimating(true);
+                                onToggleBookmark(item.id!);
+                                setTimeout(() => setAnimating(false), 400);
+                            }}
+                            title={isBookmarked ? "Remove bookmark" : "Bookmark this opportunity"}
+                            className={`shrink-0 p-1.5 rounded-lg transition-all duration-200 ${
+                                isBookmarked
+                                    ? "text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                                    : "text-slate-400 hover:text-rose-500 hover:bg-rose-50"
+                            } ${animating ? "scale-125" : "scale-100"}`}
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="w-4 h-4"
+                                viewBox="0 0 24 24"
+                                fill={isBookmarked ? "currentColor" : "none"}
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                        </button>
+                    )}
+
+                    {/* External link */}
+                    <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open original"
+                        onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                    </a>
+                </div>
             </div>
 
             {/* ── Title ────────────────────────────────────────────── */}

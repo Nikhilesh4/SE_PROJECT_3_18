@@ -1,5 +1,4 @@
 # Task 1: Requirements and Subsystems
-
 ## 1. Functional Requirements (FR)
 Functional requirements define the core capabilities and services the UniCompass system provides to its users.
 

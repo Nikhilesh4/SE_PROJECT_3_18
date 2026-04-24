@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
+import { useBookmarks } from "@/lib/useBookmarks";
 import { NormalizedRssItem, RssAggregationResponse } from "@/lib/useFeed";
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string; icon: string }> = {
@@ -47,6 +48,8 @@ export default function OpportunityDetailPage() {
     const [item, setItem] = useState<NormalizedRssItem | null>(null);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const { isBookmarked, toggleBookmark } = useBookmarks();
+    const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
 
     const itemId = typeof params.id === "string" ? decodeURIComponent(params.id) : "";
 
@@ -281,6 +284,34 @@ export default function OpportunityDetailPage() {
                                 </svg>
                                 Visit Original Source
                             </a>
+                            {item.id != null && (
+                                <button
+                                    onClick={() => {
+                                        setBookmarkAnimating(true);
+                                        toggleBookmark(item.id!);
+                                        setTimeout(() => setBookmarkAnimating(false), 400);
+                                    }}
+                                    className={`inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold border transition-all text-sm ${
+                                        isBookmarked(item.id)
+                                            ? "bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100"
+                                            : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
+                                    } ${bookmarkAnimating ? "scale-105" : "scale-100"}`}
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="w-4 h-4"
+                                        viewBox="0 0 24 24"
+                                        fill={item.id != null && isBookmarked(item.id) ? "currentColor" : "none"}
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                                    </svg>
+                                    {item.id != null && isBookmarked(item.id) ? "Bookmarked ✓" : "Bookmark"}
+                                </button>
+                            )}
                             <button
                                 onClick={() => {
                                     navigator.clipboard.writeText(item.url);
