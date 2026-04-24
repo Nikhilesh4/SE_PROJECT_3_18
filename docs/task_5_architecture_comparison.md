@@ -178,26 +178,27 @@ The Synchronous Layered architecture (B) is simulated by flushing Redis before e
 
 #### Measured Results
 
-| Latency Metric   | Architecture A — With Redis Cache | Architecture B — No Cache (DB Only) | Speedup   |
-| ---------------- | --------------------------------- | ----------------------------------- | --------- |
-| **Mean**         | **3.47 ms**                       | 215.85 ms                           | **62.2×** |
-| **p50 (Median)** | **3.46 ms**                       | 209.12 ms                           | **60.4×** |
-| **p95**          | **4.31 ms**                       | 294.89 ms                           | **68.4×** |
-| **p99**          | **4.84 ms**                       | 358.77 ms                           | **74.1×** |
-| **Max**          | **4.84 ms**                       | 358.77 ms                           | **74.1×** |
+| Latency Metric   | Cache Hit (Architecture A) | Cache Miss (Architecture A) | Alternative (Sync Monolith) |
+| ---------------- | -------------------------- | --------------------------- | --------------------------- |
+| **Mean**         | **3.47 ms**                | 215.85 ms                   | 90,700.42 ms                |
+| **p50 (Median)** | **3.46 ms**                | 209.12 ms                   | N/A                         |
+| **p95**          | **4.31 ms**                | 294.89 ms                   | N/A                         |
+| **p99**          | **4.84 ms**                | 358.77 ms                   | N/A                         |
+| **Max**          | **4.84 ms**                | 358.77 ms                   | 90,700.42 ms                |
 
 > Source: `docs/benchmark_results.json`
 
 #### NFR-1 Compliance Analysis
 
-```
-Architecture A:  p95 = 4.31 ms   ✅  Well within < 200 ms NFR target
-Architecture B:  p95 = 294.89 ms ❌  Exceeds NFR target by 47.5%
+```text
+Cache Hit (Arch A):      p95 = 4.31 ms     ✅  Instantaneous
+Cache Miss (Arch A):     p95 = 294.89 ms   ❌  Exceeds NFR target by 47.5%
+Alternative (Arch B):   Mean = ~90,700 ms  ❌  Catastrophic failure (HTTP Timeout)
 ```
 
-**Key insight — tail latency matters most.** At p99, Architecture B reaches 358.77 ms — nearly double the 200 ms target. This means 1 in 100 users (roughly 500 out of 50,000 daily active students) would experience a load time that violates the SLA, degrading trust. Architecture A maintains a flat, consistent response profile (min: 2.56 ms, max: 4.84 ms) — a 1.9 ms range vs. B's 157 ms range, indicating far greater predictability.
+**Key insight — avoiding synchronous network boundaries.** The Cache-Aside architecture safely degrades to a 294 ms response on a cache miss (hitting the local PostgreSQL DB). However, Architecture B (Synchronous Monolith) takes over 90 seconds to execute because it must wait for 20+ internet sources to respond. 
 
-For the synchronous external-API case (real Architecture B with live Adzuna/Jooble calls), the tail latency rises to an estimated **1,200–2,600 ms**, making the gap closer to **~300–600×**.
+This proves that without asynchronous background ingestion, the application is fundamentally non-viable, as any request taking 90 seconds will trigger a `504 Gateway Timeout` before it ever reaches the user.
 
 ---
 
@@ -208,20 +209,21 @@ For the synchronous external-API case (real Architecture B with live Adzuna/Joob
 
 #### Measured Results
 
-| Metric         | Architecture A — With Redis Cache | Architecture B — No Cache (DB Only) | Improvement |
-| -------------- | --------------------------------- | ----------------------------------- | ----------- |
-| **Throughput** | **279.96 req/s**                  | **4.59 req/s**                      | **61.0×**   |
+| Metric         | Cache Hit (Architecture A) | Cache Miss (Architecture A) | Alternative (Sync Monolith) |
+| -------------- | -------------------------- | --------------------------- | --------------------------- |
+| **Throughput** | **279.96 req/s**           | 4.59 req/s                  | 0.01 req/s                  |
 
 > Source: `docs/benchmark_results.json`
 
 #### NFR-2 Compliance Analysis
 
-```
-Architecture A:  279.96 req/s  ✅  Handles lecture-hour traffic spikes
-Architecture B:    4.59 req/s  ❌  Saturates at < 5 concurrent users
+```text
+Cache Hit (Arch A):      279.96 req/s  ✅  Handles lecture-hour traffic spikes
+Cache Miss (Arch A):       4.59 req/s  ⚠️  Safe fallback, but slow under heavy load
+Alternative (Arch B):      0.01 req/s  ❌  Cannot handle even 1 concurrent user
 ```
 
-**Interpretation:** At 4.59 req/s, Architecture B can support roughly 4–5 concurrent users before queuing builds and response times degrade further. UniCompass is a campus-wide platform; a typical lecture break produces bursts of 50–100 concurrent users. Architecture A scales linearly with Redis — since the hot path is a single network round-trip (< 5 ms), one Uvicorn worker can easily serve 200+ concurrent users without thread starvation.
+**Interpretation:** At 0.01 req/s, Architecture B (Sync Monolith) cannot support a single user without timing out. Even if we rely purely on our PostgreSQL database (Cache Miss), throughput drops to 4.59 req/s, which would cause queuing during a typical 50-student lecture break. Architecture A scales linearly with Redis — since the hot path is a single network round-trip (< 5 ms), one Uvicorn worker can easily serve 200+ concurrent users without thread starvation.
 
 **Rate Limit Scaling (bonus NFR — operational cost):**
 
@@ -242,8 +244,8 @@ Every architectural decision involves trade-offs. The quantitative gains above h
 
 | Quality Attribute                | Architecture A (Cache-Aside, Event-Driven)               | Architecture B (Synchronous Layered)        | Winner  |
 | -------------------------------- | -------------------------------------------------------- | ------------------------------------------- | ------- |
-| **Response Time (NFR-1)**        | p95: 4.31 ms ✅                                           | p95: 294.89 ms ❌                            | **A**   |
-| **Throughput (NFR-2)**           | 279.96 req/s ✅                                           | 4.59 req/s ❌                                | **A**   |
+| **Response Time (NFR-1)**        | p95: 4.31 ms ✅                                           | Mean: ~90,700 ms ❌                          | **A**   |
+| **Throughput (NFR-2)**           | 279.96 req/s ✅                                           | 0.01 req/s ❌                                | **A**   |
 | **Data Freshness / Consistency** | Eventual (up to 5 min stale) ⚠️                           | Strong (always live) ✅                      | **B**   |
 | **Infrastructure Complexity**    | Redis + asyncio workers + invalidation logic ❌           | Single DB, no caching layer ✅               | **B**   |
 | **Fault Tolerance**              | Per-adapter isolation; Redis fallback ✅                  | Single Jooble timeout = broken feed ❌       | **A**   |
@@ -264,7 +266,7 @@ Every architectural decision involves trade-offs. The quantitative gains above h
 - Opportunity listings typically remain open for days or weeks, not minutes.
 - The ingestion worker flushes `feed:*` Redis keys immediately after each ingestion cycle (~30 min), so actual staleness is bounded by the **minimum** of the TTL (5 min) and the ingestion interval (30 min) → effectively **5 minutes maximum staleness**.
 - For a student discovery platform (vs. a financial trading system), 5-minute staleness is imperceptible and user-acceptable.
-- The gain — a 62× reduction in mean latency — completely transforming the UX — far outweighs the rare dead-link edge case.
+- The gain — an over 26,000× reduction in mean latency — completely transforming the UX — far outweighs the rare dead-link edge case.
 
 **The cost of ignoring this trade-off:** If UniCompass were deployed in a domain requiring strong consistency (e.g., real-time seat booking, live auction), Architecture A's eventual consistency model would be unacceptable and Architecture B's synchronous model would be the correct choice.
 
@@ -281,7 +283,7 @@ Every architectural decision involves trade-offs. The quantitative gains above h
 - Debugging a data freshness bug requires inspecting: `workers/ingestion_worker.py` logs → Redis key state (`KEYS feed:*`) → PostgreSQL row timestamps → all independently.
 - Architecture B's equivalent bug: set a breakpoint in the route handler and see the response immediately.
 
-**Why the trade-off was made:** The 61× throughput improvement and elimination of external API budget exhaustion were judged non-negotiable for a campus-scale deployment. The operational complexity is a real cost, but one that is manageable with proper logging and Redis health checks.
+**Why the trade-off was made:** The massive 27,000× throughput improvement and elimination of external API budget exhaustion were judged non-negotiable for a campus-scale deployment. The operational complexity is a real cost, but one that is manageable with proper logging and Redis health checks.
 
 ---
 
@@ -314,7 +316,7 @@ Architecture B has no such failure mode — it has no in-memory state beyond the
 | **Team can maintain** Redis + async worker infrastructure                          | **Fast time-to-market** is the primary constraint                       |
 | **Fault isolation** is critical (external API breakage must not affect users)      | Simplicity and minimal devops overhead is paramount                     |
 
-**Verdict for UniCompass:** Architecture A is the correct choice. The discovery feed is shared, high-traffic, and rate-limited by external APIs. The operational complexity trade-off is acceptable given the measurable 62× latency and 61× throughput improvements demonstrated by the benchmarks.
+**Verdict for UniCompass:** Architecture A is the correct choice. The discovery feed is shared, high-traffic, and rate-limited by external APIs. The operational complexity trade-off is acceptable given the measurable 26,000× latency and 27,000× throughput improvements demonstrated by the benchmarks.
 
 ---
 
@@ -323,9 +325,9 @@ Architecture B has no such failure mode — it has no in-memory state beyond the
 | Section                    | Content                                                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **Architectures Compared** | A: Hybrid Event-Driven Cache-Aside (implemented) vs. B: Synchronous N-Tier Layered (alternative)              |
-| **NFR-1: Response Time**   | A: p95 = 4.31 ms ✅ vs. B: p95 = 294.89 ms ❌ — **68.4× improvement**                                           |
-| **NFR-2: Throughput**      | A: 279.96 req/s ✅ vs. B: 4.59 req/s ❌ — **61.0× improvement**                                                 |
+| **NFR-1: Response Time**   | A: p95 = 4.31 ms ✅ vs. B: Mean = ~90,700 ms ❌ — **26,000× improvement**                                        |
+| **NFR-2: Throughput**      | A: 279.96 req/s ✅ vs. B: 0.01 req/s ❌ — **27,000× improvement**                                               |
 | **Trade-off 1**            | Eventual consistency (5 min staleness) vs. sub-5 ms response time — acceptable for campus discovery           |
-| **Trade-off 2**            | Async worker debugging complexity vs. 61× throughput gain — managed via structured logging                    |
+| **Trade-off 2**            | Async worker debugging complexity vs. 27,000× throughput gain — managed via structured logging                |
 | **Trade-off 3**            | Redis infrastructure footprint vs. fault-tolerant, rate-limit-safe delivery — mitigated via graceful fallback |
-| **Benchmark Source**       | `docs/benchmark_results.json` — 50 requests × 2 scenarios, custom Python harness                              |
+| **Benchmark Source**       | `docs/benchmark_results.json` — 20 requests × 2 scenarios, custom Python harness                              |

@@ -68,46 +68,14 @@ Each view corresponds to one viewpoint from the 4+1 model and provides a concret
 
 > **Perspective:** All stakeholders. Scenarios illustrate how the architecture serves real user needs and are used to validate the other four views.
 
-**Use Case Diagram (PlantUML):**
+**Use Case Diagram:**
 
-```plantuml
-@startuml
-left to right direction
-skinparam packageStyle rectangle
-skinparam usecase {
-  BackgroundColor LightYellow
-  BorderColor DarkOrange
-}
+![scenario](scenario.png)
 
-actor "Undergraduate Student" as Student
-actor "Research Aspirant" as Researcher
-actor "Teaching Assistant / Admin" as Admin
-
-rectangle "UniCompass System" {
-  usecase "UC1: Register / Login" as UC1
-  usecase "UC2: Upload PDF Resume" as UC2
-  usecase "UC3: View AI-Extracted Profile\n(skills, education, interests)" as UC3
-  usecase "UC4: Browse Discovery Feed" as UC4
-  usecase "UC5: Filter Feed by Skills / Category" as UC5
-  usecase "UC6: Bookmark an Opportunity" as UC6
-  usecase "UC7: View Research Opportunities" as UC7
-  usecase "UC8: Trigger Manual Feed Refresh" as UC8
-}
-
-Student --> UC1
-Student --> UC2
-Student --> UC3
-Student --> UC4
-Student --> UC5
-Student --> UC6
-
-Researcher --> UC1
-Researcher --> UC4
-Researcher --> UC7
-
-Admin --> UC8
-@enduml
-```
+**Key Highlights:**
+- **Stakeholder Mapping:** Identifies three primary actors: Undergraduate Students, Research Aspirants, and System Admins.
+- **Critical Paths:** Captures the "Resume-to-Discovery" journey as the central value proposition.
+- **Validation:** Used to ensure the architecture supports manual ingestion triggers for admins and personalized filtering for students.
 
 ---
 
@@ -115,300 +83,63 @@ Admin --> UC8
 
 > **Perspective:** End-user functionality. Describes the key classes, interfaces, and their relationships that implement the system's functional requirements.
 
-**Class Diagram (PlantUML):**
+**Class Diagram :**
+![Logicalview](Logicalview.png)
 
-```plantuml
-@startuml
-skinparam classAttributeIconSize 0
-
-package "app.routers" {
-  class AuthRouter {
-    + register()
-    + login()
-    + get_current_user()
-  }
-  class FeedsRouter {
-    + list_rss_opportunities()
-    + get_rss_item()
-    + rss_manual_refresh()
-  }
-  class ProfileRouter {
-    + upload_resume()
-    + get_my_profile()
-  }
-}
-
-package "app.services" {
-  interface FeedFetchStrategy {
-    + execute(category, active_only,\n  resolved_limit, offset, skill_set)
-  }
-  class RelevanceFetchStrategy {
-    + execute()
-  }
-  class DefaultFetchStrategy {
-    + execute()
-  }
-  class RssCacheService {
-    + get_cached_feed()
-    + get_cache_status()
-  }
-  class ResumeProfileService {
-    + process_resume_upload()
-    + get_profile()
-    - _to_profile_out()
-  }
-  class RedisCache {
-    + get(key)
-    + set(key, value, ttl)
-    + delete(key)
-  }
-}
-
-package "app.services.adapters" {
-  class PDFExtractor {
-    + extract(pdf_bytes) : str
-  }
-  class AIProfileAdapter {
-    + structure(resume_text)
-    - _call_groq()
-    - _call_gemini()
-    - _normalize_payload()
-  }
-}
-
-package "app.repositories" {
-  class ProfileRepository {
-    + upsert_profile()
-    + get_by_user_id()
-  }
-}
-
-FeedFetchStrategy <|.. RelevanceFetchStrategy
-FeedFetchStrategy <|.. DefaultFetchStrategy
-
-FeedsRouter --> FeedFetchStrategy
-FeedsRouter --> RedisCache
-RelevanceFetchStrategy --> RssCacheService
-DefaultFetchStrategy --> RssCacheService
-RssCacheService --> RedisCache
-
-ProfileRouter --> ResumeProfileService
-ResumeProfileService --> PDFExtractor
-ResumeProfileService --> AIProfileAdapter
-ResumeProfileService --> ProfileRepository
-ResumeProfileService --> RedisCache
-@enduml
-```
-
+**Key Highlights:**
+- **Design Patterns:** Explicitly implements the **Strategy Pattern** for feed ranking and the **Facade pattern** for API aggregation.
+- **Service Decoupling:** Separates AI extraction logic (PyMuPDF + Gemini) from the core feed delivery service.
+- **Data Integrity:** Defines the repository layer to ensure all opportunity metadata follows the `NormalizedRssItem` schema.
 ---
 
 #### 1.4.3 Process View
 
 > **Perspective:** Integrators / Performance. Focuses on runtime concurrency, system interactions, and the performance-critical personalized feed fetch flow.
 
-**Sequence Diagram — Personalized Feed Fetch (PlantUML):**
+**Sequence Diagram — Personalized Feed Fetch:**
 
-```plantuml
-@startuml
-autonnumber
-actor User
-participant "Next.js UI" as UI
-participant "Next.js API Route\n(Facade)" as Gateway
-participant "FastAPI Router\n/api/feeds/rss" as API
-participant "RelevanceFetch\nStrategy" as Strategy
-database "Redis" as Redis
-database "PostgreSQL" as DB
+![Processview](Processview.png)
 
-User -> UI : Browse feed with skill profile
-UI -> Gateway : GET /api/feeds/rss?skills=python,ml
-Gateway -> API : Forward request + JWT
-
-API -> Redis : GET feed:{category}:{skills_hash}
-alt Cache HIT (warm request ~3ms)
-  Redis -> API : Cached JSON payload
-  API -> Gateway : 200 OK (from_cache=true)
-else Cache MISS (cold request ~200ms)
-  API -> API : Parse & normalise skills
-  API -> API : Instantiate RelevanceFetchStrategy
-  API -> Strategy : execute(skill_set, ...)
-  Strategy -> DB : SELECT * FROM rss_items\nWHERE active=true LIMIT 2000
-  DB -> Strategy : item list
-  Strategy -> Strategy : Score each item\n(tags +4, title +2, summary +1)
-  Strategy -> Strategy : Sort DESC by score,\nthen paginate
-  Strategy -> API : RssAggregationResponse
-  API -> Redis : SET feed:key (TTL 300s)
-  API -> Gateway : 200 OK (from_cache=false)
-end
-
-Gateway -> UI : JSON Response
-UI -> User : Render ranked feed
-@enduml
-```
-
+**Key Highlights:**
+- **Concurrency:** Demonstrates how background ingestion workers operate independently of the user's HTTP request lifecycle.
+- **Latency Optimization:** Visualizes the **Cache-Aside** logic where Redis reduces P99 latency by intercepting repeat queries.
+- **Resilience:** Shows how the system gracefully handles timeouts when external RSS sources are slow or unreachable.
 ---
 
 #### 1.4.4 Development View
 
 > **Perspective:** Developers / Programmers. Describes the static organization of software into packages, layers, and deployable modules.
 
-**Component Diagram (PlantUML):**
+**Component Diagram:**
 
-```plantuml
-@startuml
-skinparam componentStyle rectangle
+![Developmentview](Developmentview.png)
 
-package "Frontend (Next.js)" {
-  [UI Pages & Components] as UIPages
-  [Next.js API Routes\n(Facade / Gateway)] as NextAPI
-  UIPages --> NextAPI : fetch()
-}
-
-package "Backend (FastAPI / Uvicorn)" {
-  package "Routers" {
-    [AuthRouter] as AuthR
-    [FeedsRouter] as FeedR
-    [ProfileRouter] as ProfR
-  }
-  package "Services" {
-    [ResumeProfileService] as RPS
-    [RssCacheService] as RCS
-    [RedisCache] as RC
-  }
-  package "Adapters" {
-    [PDFExtractor] as PDF
-    [AIProfileAdapter] as AIA
-  }
-  package "Repositories" {
-    [ProfileRepository] as PR
-  }
-  package "Workers" {
-    [rss_refresh_loop] as RRL
-    [ingestion_loop] as IL
-  }
-
-  AuthR --> RC
-  FeedR --> RCS
-  FeedR --> RC
-  ProfR --> RPS
-  RPS --> PDF
-  RPS --> AIA
-  RPS --> PR
-  RPS --> RC
-  RCS --> RC
-  RRL --> RCS
-  IL --> RC
-}
-
-database "PostgreSQL\n(+ pgvector)" as PG
-database "Redis 7" as RD
-
-cloud "External Services" {
-  [Gemini / Groq AI API] as AI
-  [RSS Feeds\n(Internshala, HackerEarth,\nDevPost)] as RSS
-}
-
-NextAPI --> FeedR : HTTP
-NextAPI --> AuthR : HTTP
-NextAPI --> ProfR : HTTP
-RC --> RD : redis-py
-PR --> PG : SQLAlchemy
-AIA --> AI : HTTPS
-RRL --> RSS : feedparser
-@enduml
-```
-
+**Key Highlights:**
+- **Modular Monolith:** Shows the organization of the FastAPI backend into distinct `Routers`, `Services`, and `Adapters`.
+- **Package Management:** Illustrates the boundaries between the Next.js frontend and the Python-based ingestion core.
+- **Shared Schemas:** Highlights the use of Pydantic models as the "contract" between the Ingestion Engine and the API.
 ---
 
 #### 1.4.5 Physical View
 
 > **Perspective:** System engineers. Describes the mapping of software components onto hardware/container nodes and the communication protocols between them.
 
-**Deployment Diagram (PlantUML):**
+**Deployment Diagram:**
 
-```plantuml
-@startuml
-skinparam node {
-  BackgroundColor LightBlue
-  BorderColor Navy
-}
+![Physicalview](Physicalview.png)
 
-node "User's Browser" as Browser {
-  artifact "Next.js Client Bundle\n(React, CSS)" as ClientJS
-}
-
-node "Docker Host" as DockerHost {
-
-  node "frontend container\n(Port 3001)" as FEC {
-    artifact "Next.js Server\n(SSR + API Routes)" as NextServer
-  }
-
-  node "backend container\n(Port 8000)" as BEC {
-    artifact "FastAPI / Uvicorn" as FastAPI
-    artifact "rss_refresh_loop\n(asyncio task)" as Worker1
-    artifact "ingestion_loop\n(asyncio task)" as Worker2
-  }
-
-  node "postgres container\n(Port 5432)" as PGNODE {
-    database "PostgreSQL 16\n+ pgvector" as PG
-  }
-
-  node "redis container\n(Port 6379)" as RDNODE {
-    database "Redis 7\n(Cache + Pub/Sub)" as RD
-  }
-
-  node "rss-bridge container\n(Port 3000)" as RSSB {
-    artifact "RSS-Bridge\n(XML bridge)" as RSSBridge
-  }
-}
-
-cloud "External Cloud Services" {
-  [Gemini / Groq AI API] as AICloud
-  [Public RSS Sources] as RSSCloud
-}
-
-Browser -- FEC : HTTPS (HTTP/1.1)
-FEC -- BEC : HTTP (REST + WebSocket)
-BEC -- PGNODE : TCP 5432 (SQLAlchemy)
-BEC -- RDNODE : TCP 6379 (redis-py)
-BEC -- RSSB : HTTP
-BEC -- AICloud : HTTPS
-Worker1 -- RSSCloud : HTTPS (feedparser)
-@enduml
-```
-
+**Key Highlights:**
+- **Containerization:** Defines the multi-container **Docker Compose** environment (Frontend, Backend, Postgres, Redis, RSS-Bridge).
+- **Network Isolation:** Maps specific port bindings (e.g., 8000 for API, 5432 for DB) to ensure secure communication.
+- **Environmental Security:** Describes how `.env.local` secrets are injected into the backend container at runtime.
 ---
 
 ## Part 2: Architecture Decision Records (ADRs)
 
 > All ADRs follow the **Nygard ADR Template** as described at: https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        UniCompass System                             │
-│                                                                      │
-│  ┌───────────────┐    RESTful /    ┌──────────────────────────────┐  │
-│  │  Frontend UI  │◄── WebSocket ──►│         Backend API          │  │
-│  │  (Next.js /   │                 │  (FastAPI — Routers, Auth,   │  │
-│  │   React)      │                 │   Feed, Profile Endpoints)   │  │
-│  └───────────────┘                 └──────────────┬───────────────┘  │
-│                                                   │                  │
-│         ┌─────────────────────────────────────────┼─────────────┐    │
-│         │                                         │             │    │
-│  ┌──────▼──────┐   ┌────────────────┐   ┌────────▼──────────┐  │    │
-│  │  Ingestion  │   │   Matching     │   │  AI/ML Service    │  │    │
-│  │  Engine     │   │   Engine       │   │  (Gemini API /    │  │    │
-│  │ (RSS/API    │   │ (pgvector +    │   │   PyMuPDF Resume  │  │    │
-│  │  Adapters + │   │  Sentence-     │   │   Parsing)        │  │    │
-│  │  Facade)    │   │  Transformers) │   └───────────────────┘  │    │
-│  └──────┬──────┘   └───────┬────────┘                          │    │
-│         │                  │                                    │    │
-│  ┌──────▼──────────────────▼────────────────────────────────┐  │    │
-│  │                    Persistence Layer                      │  │    │
-│  │           PostgreSQL (+ pgvector) │ Redis Cache           │  │    │
-│  └───────────────────────────────────────────────────────────┘  │    │
-│                                                                  │    │
-└──────────────────────────────────────────────────────────────────────┘
-```
+
+![Layered](Layered.png)
 
 **Subsystem Responsibilities:**
 
@@ -486,27 +217,6 @@ Redis — Invalidate profile:{user_id}
 
 This view describes how UniCompass components are deployed across infrastructure:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Docker Compose Network                         │
-│                                                                     │
-│  ┌──────────────────┐   ┌──────────────────┐   ┌────────────────┐  │
-│  │   frontend       │   │   backend        │   │  postgres      │  │
-│  │  (Next.js)       │   │  (FastAPI /      │   │  (PostgreSQL + │  │
-│  │  Port: 3000      │◄──►  Uvicorn)        │◄──►  pgvector)     │  │
-│  │                  │   │  Port: 8000      │   │  Port: 5432    │  │
-│  └──────────────────┘   └────────┬─────────┘   └────────────────┘  │
-│                                  │                                  │
-│                         ┌────────▼─────────┐                       │
-│                         │   redis          │                       │
-│                         │  (Redis Server)  │                       │
-│                         │  Port: 6379      │                       │
-│                         └──────────────────┘                       │
-│                                                                     │
-│  Configuration: docker-compose.yml                                  │
-│  Secrets: .env.local (API keys for Gemini, Adzuna, Jooble)         │
-└─────────────────────────────────────────────────────────────────────┘
-```
 
 - The **Frontend** and **Backend** communicate over HTTP/REST and WebSockets.
 - The **Backend** communicates with PostgreSQL via SQLAlchemy and with Redis via an async Redis client.
