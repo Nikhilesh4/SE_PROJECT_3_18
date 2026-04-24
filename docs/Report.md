@@ -1,3 +1,5 @@
+
+
 # UniCompass: AI-Powered Opportunity Discovery Platform
 ## Comprehensive Architectural Report
 
@@ -18,7 +20,7 @@
    - [Part 2: Implementation Patterns](#part-2-implementation-patterns)
    - [Summary Table](#summary-table)
 4. [Task 4: Architecture Comparison](#task-4-architecture-comparison--implemented-vs-alternative-pattern)
-
+****
 ---
 
 # Task 1: Requirements and Subsystems
@@ -77,14 +79,14 @@ These are the key requirements that have a major impact on the system’s design
 
 The UniCompass system is divided into several logical subsystems, each with a specific role:
 
-| Subsystem | Description | Key Technologies |
-| :--- | :--- | :--- |
-| **Frontend UI** | Manages user interaction, displays the discovery feed, provides profile management interfaces, and renders real-time notifications. | React, Next.js, TailwindCSS |
-| **Backend API** | Orchestrates business logic, manages user authentication, provides RESTful endpoints, and handles application state. | Python, FastAPI, JWT |
-| **Ingestion Engine** | A dedicated background process that polls RSS feeds and external APIs, parses content, and normalizes it for storage. | Feedparser, External APIs |
-| **Matching Engine** | Generates embeddings for opportunities and profiles; performs vector similarity searches to enable personalized rankings. | Sentence-Transformers, pgvector |
-| **Persistence Layer** | Handles structured data storage (users/opportunities) and high-speed caching/message brokering for inter-service communication. | PostgreSQL, Redis |
-| **AI/ML Service** | Provides intelligent processing for unstructured data, specifically extracting structured profile information from PDF resumes. | Gemini API, PyMuPDF |
+| Subsystem             | Description                                                                                                                         | Key Technologies                |
+| :-------------------- | :---------------------------------------------------------------------------------------------------------------------------------- | :------------------------------ |
+| **Frontend UI**       | Manages user interaction, displays the discovery feed, provides profile management interfaces, and renders real-time notifications. | React, Next.js, TailwindCSS     |
+| **Backend API**       | Orchestrates business logic, manages user authentication, provides RESTful endpoints, and handles application state.                | Python, FastAPI, JWT            |
+| **Ingestion Engine**  | A dedicated background process that polls RSS feeds and external APIs, parses content, and normalizes it for storage.               | Feedparser, External APIs       |
+| **Matching Engine**   | Generates embeddings for opportunities and profiles; performs vector similarity searches to enable personalized rankings.           | Sentence-Transformers, pgvector |
+| **Persistence Layer** | Handles structured data storage (users/opportunities) and high-speed caching/message brokering for inter-service communication.     | PostgreSQL, Redis               |
+| **AI/ML Service**     | Provides intelligent processing for unstructured data, specifically extracting structured profile information from PDF resumes.     | Gemini API, PyMuPDF             |
 
 
 
@@ -106,15 +108,15 @@ The UniCompass system is divided into several logical subsystems, each with a sp
 
 Based on the UniCompass project requirements document, the following stakeholders have been identified:
 
-| ID  | Stakeholder                     | Role / Description |
-|-----|---------------------------------|--------------------|
-| SH1 | **Undergraduate Students**      | Primary end-users who browse the discovery feed, filter opportunities, bookmark items, and upload resumes for AI-based profile extraction. |
-| SH2 | **Postgraduate / Research Aspirants** | End-users who leverage the Semantic Scholar integration to discover research openings, published papers, and lab opportunities. |
-| SH3 | **System Architects / Developers (Team 18)** | Design and build the system. Responsible for ensuring that architectural decisions align with quality attributes like scalability, maintainability, and performance. |
-| SH4 | **Academic Evaluators / Teaching Assistants** | Assess project deliverables for compliance with software engineering standards, design pattern usage, and architectural quality. |
-| SH5 | **External API Providers**      | Third-party services (Adzuna, Jooble, Semantic Scholar, Internshala RSS, HackerEarth RSS, DevPost RSS) whose APIs and feeds provide raw opportunity data to the system. |
-| SH6 | **Database Administrator (Logical Role)** | Responsible for PostgreSQL schema design, pgvector extension management, and Redis configuration. May overlap with SH3 in a small team. |
-| SH7 | **AI/ML Service Provider (Google DeepMind / Gemini)** | The Gemini API is used for resume parsing and structured data extraction; its availability, token limits, and API changes directly affect the system. |
+| ID  | Stakeholder                                           | Role / Description                                                                                                                                                      |
+| --- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SH1 | **Undergraduate Students**                            | Primary end-users who browse the discovery feed, filter opportunities, bookmark items, and upload resumes for AI-based profile extraction.                              |
+| SH2 | **Postgraduate / Research Aspirants**                 | End-users who leverage the Semantic Scholar integration to discover research openings, published papers, and lab opportunities.                                         |
+| SH3 | **System Architects / Developers (Team 18)**          | Design and build the system. Responsible for ensuring that architectural decisions align with quality attributes like scalability, maintainability, and performance.    |
+| SH4 | **Academic Evaluators / Teaching Assistants**         | Assess project deliverables for compliance with software engineering standards, design pattern usage, and architectural quality.                                        |
+| SH5 | **External API Providers**                            | Third-party services (Adzuna, Jooble, Semantic Scholar, Internshala RSS, HackerEarth RSS, DevPost RSS) whose APIs and feeds provide raw opportunity data to the system. |
+| SH6 | **Database Administrator (Logical Role)**             | Responsible for PostgreSQL schema design, pgvector extension management, and Redis configuration. May overlap with SH3 in a small team.                                 |
+| SH7 | **AI/ML Service Provider (Google DeepMind / Gemini)** | The Gemini API is used for resume parsing and structured data extraction; its availability, token limits, and API changes directly affect the system.                   |
 
 ---
 
@@ -122,15 +124,15 @@ Based on the UniCompass project requirements document, the following stakeholder
 
 Each stakeholder has distinct concerns about the system that must be addressed by the architecture:
 
-| Stakeholder | Key Concerns |
-|-------------|-------------|
-| **SH1 – Undergraduate Students** | Discovery feed loads quickly (< 200 ms for cached responses); opportunities are accurate, relevant, and up-to-date; resume parsing correctly identifies their skills; bookmarks are reliably persisted; the interface is intuitive and works on all devices. |
-| **SH2 – Research Aspirants** | Research opportunities from Semantic Scholar are surfaced alongside jobs and internships; semantic ranking prioritizes relevance to academic interests; profile embeddings reflect postgraduate intentions. |
-| **SH3 – Architects / Developers** | Clean separation of concerns across subsystems (Ingestion, Matching, API, Frontend); system is extensible to support new opportunity sources; background workers do not block the main API thread; codebase is maintainable and follows SOLID principles. |
-| **SH4 – Academic Evaluators** | IEEE 42010–compliant architecture documentation; demonstrable use of recognized design patterns (Facade, Adapter, Strategy, Observer/Pub-Sub); adherence to the project requirements specification; clear ADRs justifying major decisions. |
-| **SH5 – External API Providers** | Rate limits are respected; API keys are securely stored; failures in one provider do not cascade to others; source attribution is maintained in opportunity records. |
-| **SH6 – Database Administrator** | Schema is normalized with appropriate indexing; pgvector extension is correctly installed; Redis TTLs and invalidation strategies prevent stale data; data deduplication prevents record proliferation. |
-| **SH7 – AI/ML Service Provider (Gemini)** | API calls are well-formed and within quota; prompts are deterministic and produce structured JSON output; fallback behavior exists for API outages or malformed responses. |
+| Stakeholder                               | Key Concerns                                                                                                                                                                                                                                                 |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **SH1 – Undergraduate Students**          | Discovery feed loads quickly (< 200 ms for cached responses); opportunities are accurate, relevant, and up-to-date; resume parsing correctly identifies their skills; bookmarks are reliably persisted; the interface is intuitive and works on all devices. |
+| **SH2 – Research Aspirants**              | Research opportunities from Semantic Scholar are surfaced alongside jobs and internships; semantic ranking prioritizes relevance to academic interests; profile embeddings reflect postgraduate intentions.                                                  |
+| **SH3 – Architects / Developers**         | Clean separation of concerns across subsystems (Ingestion, Matching, API, Frontend); system is extensible to support new opportunity sources; background workers do not block the main API thread; codebase is maintainable and follows SOLID principles.    |
+| **SH4 – Academic Evaluators**             | IEEE 42010–compliant architecture documentation; demonstrable use of recognized design patterns (Facade, Adapter, Strategy, Observer/Pub-Sub); adherence to the project requirements specification; clear ADRs justifying major decisions.                   |
+| **SH5 – External API Providers**          | Rate limits are respected; API keys are securely stored; failures in one provider do not cascade to others; source attribution is maintained in opportunity records.                                                                                         |
+| **SH6 – Database Administrator**          | Schema is normalized with appropriate indexing; pgvector extension is correctly installed; Redis TTLs and invalidation strategies prevent stale data; data deduplication prevents record proliferation.                                                      |
+| **SH7 – AI/ML Service Provider (Gemini)** | API calls are well-formed and within quota; prompts are deterministic and produce structured JSON output; fallback behavior exists for API outages or malformed responses.                                                                                   |
 
 ---
 
@@ -138,13 +140,13 @@ Each stakeholder has distinct concerns about the system that must be addressed b
 
 Following the **4+1 View Model** (Kruchten, 1995), five complementary viewpoints are defined to address the concerns of all stakeholders. The **Scenarios view** acts as the glue that ties the other four views together.
 
-| View | Perspective | Addressed Concerns | Primary Stakeholders |
-|------|-------------|--------------------|----------------------|
-| **Scenarios (Use Case View)** | Putting it all together | System consistency, end-to-end flows, and key use cases that validate the architecture. | All Stakeholders |
-| **Logical View** | End-user functionality | Functional requirements; key classes, interfaces, and their relationships. | SH1, SH2, SH3, SH4 |
-| **Process View** | Integrators / Performance | Runtime concurrency, performance, scalability, and availability concerns. | SH3, SH5, SH6 |
-| **Development View** | Developers / Programmers | Static software organization — packages, modules, layers, and build structure. | SH3, SH4 |
-| **Physical View** | System engineers | Hardware topology, deployment environment, and physical communication links. | SH3, SH6 |
+| View                          | Perspective               | Addressed Concerns                                                                      | Primary Stakeholders |
+| ----------------------------- | ------------------------- | --------------------------------------------------------------------------------------- | -------------------- |
+| **Scenarios (Use Case View)** | Putting it all together   | System consistency, end-to-end flows, and key use cases that validate the architecture. | All Stakeholders     |
+| **Logical View**              | End-user functionality    | Functional requirements; key classes, interfaces, and their relationships.              | SH1, SH2, SH3, SH4   |
+| **Process View**              | Integrators / Performance | Runtime concurrency, performance, scalability, and availability concerns.               | SH3, SH5, SH6        |
+| **Development View**          | Developers / Programmers  | Static software organization — packages, modules, layers, and build structure.          | SH3, SH4             |
+| **Physical View**             | System engineers          | Hardware topology, deployment environment, and physical communication links.            | SH3, SH6             |
 
 ---
 
@@ -188,7 +190,7 @@ Each view corresponds to one viewpoint from the 4+1 model and provides a concret
 
 **Sequence Diagram — Personalized Feed Fetch:**
 
-![Processview](Processview.png)
+![Processview](processview.png)
 
 **Key Highlights:**
 - **Concurrency:** Demonstrates how background ingestion workers operate independently of the user's HTTP request lifecycle.
@@ -226,18 +228,18 @@ Each view corresponds to one viewpoint from the 4+1 model and provides a concret
 
 
 
-![Layered](Layered.png)
+![Layered](ayered.png)
 
 **Subsystem Responsibilities:**
 
-| Subsystem | Responsibility |
-|-----------|---------------|
-| **Frontend UI** | Renders the discovery feed, manages authentication UI (login/register), provides resume upload UX, displays real-time notification bell via WebSocket. |
-| **Backend API** | Orchestrates all business logic; exposes `/auth`, `/api/feed`, and `/profile` RESTful endpoints; manages JWT middleware; acts as WebSocket server for notifications. |
-| **Ingestion Engine** | Polls external sources (RSS feeds via Feedparser, Adzuna API, Jooble API) on a periodic schedule; uses the Facade + Adapter pattern to normalize disparate data formats into a common `NormalizedRssItem` schema; deduplicates by source URL; upserts to PostgreSQL. |
-| **Matching Engine** | Encodes opportunity text and user profiles as vector embeddings (Sentence-Transformers); stores embeddings in PostgreSQL via pgvector; performs cosine similarity search for relevance-based feed sorting. |
-| **AI/ML Service** | Receives uploaded PDF resumes; extracts raw text via PyMuPDF; sends text to Gemini API with a structured prompt; parses returned JSON for skills, education, and experience. |
-| **Persistence Layer** | PostgreSQL serves as the primary relational data store (users, opportunities, bookmarks, profiles, embeddings). Redis serves as a high-speed cache for feed responses, profile data, and a Pub/Sub broker for real-time notification events. |
+| Subsystem             | Responsibility                                                                                                                                                                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Frontend UI**       | Renders the discovery feed, manages authentication UI (login/register), provides resume upload UX, displays real-time notification bell via WebSocket.                                                                                                               |
+| **Backend API**       | Orchestrates all business logic; exposes `/auth`, `/api/feed`, and `/profile` RESTful endpoints; manages JWT middleware; acts as WebSocket server for notifications.                                                                                                 |
+| **Ingestion Engine**  | Polls external sources (RSS feeds via Feedparser, Adzuna API, Jooble API) on a periodic schedule; uses the Facade + Adapter pattern to normalize disparate data formats into a common `NormalizedRssItem` schema; deduplicates by source URL; upserts to PostgreSQL. |
+| **Matching Engine**   | Encodes opportunity text and user profiles as vector embeddings (Sentence-Transformers); stores embeddings in PostgreSQL via pgvector; performs cosine similarity search for relevance-based feed sorting.                                                           |
+| **AI/ML Service**     | Receives uploaded PDF resumes; extracts raw text via PyMuPDF; sends text to Gemini API with a structured prompt; parses returned JSON for skills, education, and experience.                                                                                         |
+| **Persistence Layer** | PostgreSQL serves as the primary relational data store (users, opportunities, bookmarks, profiles, embeddings). Redis serves as a high-speed cache for feed responses, profile data, and a Pub/Sub broker for real-time notification events.                         |
 
 ---
 
@@ -247,16 +249,16 @@ This view describes the primary data entities and how data flows through the sys
 
 **Core Data Entities:**
 
-| Entity | Primary Store | Key Attributes |
-|--------|--------------|----------------|
-| `User` | PostgreSQL | id, name, email, hashed_password, skills[], interests[], profile_embedding (vector) |
-| `Opportunity (rss_items)` | PostgreSQL | id, title, url (unique key for dedup), source, category, published_at, deadline, embedding (vector) |
-| `Bookmark` | PostgreSQL | user_id (FK), opportunity_id (FK), created_at |
-| `UserProfile` | PostgreSQL | user_id (FK), extracted_skills, education, experience (jsonb) |
-| `Feed Cache` | Redis | Key: `feed:{category}:{sort}:{page}`, TTL: 5–10 min |
-| `Profile Cache` | Redis | Key: `profile:{user_id}`, TTL: 1 hour |
-| `Opportunity Cache` | Redis | Key: `opportunity:{id}`, TTL: 30 min |
-| `Notification Event` | Redis Pub/Sub | Channel: `notifications:{user_id}`, payload: opportunity match |
+| Entity                    | Primary Store | Key Attributes                                                                                      |
+| ------------------------- | ------------- | --------------------------------------------------------------------------------------------------- |
+| `User`                    | PostgreSQL    | id, name, email, hashed_password, skills[], interests[], profile_embedding (vector)                 |
+| `Opportunity (rss_items)` | PostgreSQL    | id, title, url (unique key for dedup), source, category, published_at, deadline, embedding (vector) |
+| `Bookmark`                | PostgreSQL    | user_id (FK), opportunity_id (FK), created_at                                                       |
+| `UserProfile`             | PostgreSQL    | user_id (FK), extracted_skills, education, experience (jsonb)                                       |
+| `Feed Cache`              | Redis         | Key: `feed:{category}:{sort}:{page}`, TTL: 5–10 min                                                 |
+| `Profile Cache`           | Redis         | Key: `profile:{user_id}`, TTL: 1 hour                                                               |
+| `Opportunity Cache`       | Redis         | Key: `opportunity:{id}`, TTL: 30 min                                                                |
+| `Notification Event`      | Redis Pub/Sub | Channel: `notifications:{user_id}`, payload: opportunity match                                      |
 
 **Data Flow — Ingestion Pipeline:**
 ```
@@ -373,12 +375,12 @@ This view directly addresses the `NFR-1: Performance (< 200 ms)` and `NFR-2: Sca
 
 **Multi-Layer Redis Caching Strategy:**
 
-| Cache Layer | Redis Key Pattern | TTL | Invalidation Trigger |
-|------------|-------------------|-----|----------------------|
-| Discovery Feed | `feed:{category}:{sort}:{page}` | 5–10 min | Ingestion worker completes |
-| Opportunity Detail | `opportunity:{id}` | 30 min | Never (immutable after ingestion) |
-| User Profile | `profile:{user_id}` | 1 hour | Resume re-upload |
-| External API Raw Response | `source:{source_name}:latest` | 30 min | Time-based expiry |
+| Cache Layer               | Redis Key Pattern               | TTL      | Invalidation Trigger              |
+| ------------------------- | ------------------------------- | -------- | --------------------------------- |
+| Discovery Feed            | `feed:{category}:{sort}:{page}` | 5–10 min | Ingestion worker completes        |
+| Opportunity Detail        | `opportunity:{id}`              | 30 min   | Never (immutable after ingestion) |
+| User Profile              | `profile:{user_id}`             | 1 hour   | Resume re-upload                  |
+| External API Raw Response | `source:{source_name}:latest`   | 30 min   | Time-based expiry                 |
 
 **Scalability Tactics:**
 - Background ingestion runs as **non-blocking asyncio tasks**, preventing main API thread starvation.
@@ -408,12 +410,12 @@ UniCompass requires a backend framework capable of:
 
 The alternatives evaluated were:
 
-| Framework | Async Support | Auto-docs | Learning Curve | WebSocket |
-|-----------|:---:|:---:|:---:|:---:|
-| Django REST Framework | Partial (via channels) | No (manual) | High | Plugin-dependent |
-| Flask | No (native sync) | No | Low | Plugin-dependent |
-| **FastAPI** | **Native (asyncio)** | **Yes (automatic)** | **Low-Medium** | **Built-in** |
-| Express.js (Node) | Yes | No | Low | Yes |
+| Framework             |     Async Support      |      Auto-docs      | Learning Curve |    WebSocket     |
+| --------------------- | :--------------------: | :-----------------: | :------------: | :--------------: |
+| Django REST Framework | Partial (via channels) |     No (manual)     |      High      | Plugin-dependent |
+| Flask                 |    No (native sync)    |         No          |      Low       | Plugin-dependent |
+| **FastAPI**           |  **Native (asyncio)**  | **Yes (automatic)** | **Low-Medium** |   **Built-in**   |
+| Express.js (Node)     |          Yes           |         No          |      Low       |       Yes        |
 
 The team's primary language competency is Python. A Python-native framework was strongly preferred to minimize overhead from language-switching.
 
@@ -489,12 +491,12 @@ UniCompass requires two distinct data management capabilities:
 
 The alternatives for the vector search component were:
 
-| Option | Description | Trade-off |
-|--------|-------------|-----------|
-| Separate vector DB (Pinecone, Weaviate) | Dedicated vector database alongside PostgreSQL | Added infrastructure, data synchronization overhead, additional cost |
-| Pure keyword search (PostgreSQL FTS) | PostgreSQL Full-Text Search | No semantic understanding; keyword matching only |
-| **pgvector** | PostgreSQL extension for vector storage & similarity | Single database, no sync needed, cosine similarity via SQL |
-| ChromaDB (embedded) | Lightweight local vector DB | Not production-grade; difficult to scale; no relational joins |
+| Option                                  | Description                                          | Trade-off                                                            |
+| --------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------- |
+| Separate vector DB (Pinecone, Weaviate) | Dedicated vector database alongside PostgreSQL       | Added infrastructure, data synchronization overhead, additional cost |
+| Pure keyword search (PostgreSQL FTS)    | PostgreSQL Full-Text Search                          | No semantic understanding; keyword matching only                     |
+| **pgvector**                            | PostgreSQL extension for vector storage & similarity | Single database, no sync needed, cosine similarity via SQL           |
+| ChromaDB (embedded)                     | Lightweight local vector DB                          | Not production-grade; difficult to scale; no relational joins        |
 
 A key constraint was the team's desire to minimize infrastructure complexity within a Docker Compose setup for a prototype. Running a separate vector database service would have added another container, synchronization logic, and failure modes.
 
@@ -539,12 +541,12 @@ Two separate architectural challenges can be addressed by Redis:
 
 **Challenge B — Real-Time Notifications:** The system must push notifications to users when new relevant opportunities arrive. Options for implementation were:
 
-| Option | Description | Trade-off |
-|--------|-------------|-----------|
-| HTTP Polling | Frontend polls `/notifications` every N seconds | High server load; latency = poll interval |
-| Server-Sent Events (SSE) | One-way streaming from server to client | No broadcast mechanism; harder to fan-out |
-| **Redis Pub/Sub + WebSocket** | Backend publishes events to Redis; WS server pushes to clients | Low latency; natural fan-out; decouples ingestion from notification |
-| Full message queue (RabbitMQ, Kafka) | Enterprise message broker | Over-engineered for prototype; adds infrastructure |
+| Option                               | Description                                                    | Trade-off                                                           |
+| ------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------- |
+| HTTP Polling                         | Frontend polls `/notifications` every N seconds                | High server load; latency = poll interval                           |
+| Server-Sent Events (SSE)             | One-way streaming from server to client                        | No broadcast mechanism; harder to fan-out                           |
+| **Redis Pub/Sub + WebSocket**        | Backend publishes events to Redis; WS server pushes to clients | Low latency; natural fan-out; decouples ingestion from notification |
+| Full message queue (RabbitMQ, Kafka) | Enterprise message broker                                      | Over-engineered for prototype; adds infrastructure                  |
 
 #### Decision
 
@@ -586,11 +588,11 @@ source:{source_name}:latest        → TTL 30 min (ingestion-side)
 
 UniCompass requires authentication to protect user-specific endpoints (profile, bookmarks, resume upload). The two primary approaches are:
 
-| Approach | Description | Trade-off |
-|----------|-------------|-----------|
-| Session-Based Auth | Server stores session state; client sends session cookie | Requires shared session store (Redis) to work across multiple server instances; statefulness complicates horizontal scaling |
-| **JWT (Stateless)** | Server issues signed token; client includes it in every request; server verifies signature without DB lookup | Stateless; scales horizontally; revocation requires a blacklist or short TTL |
-| OAuth 2.0 + Social Login | Delegate auth to Google/GitHub | Good UX but complex integration; out of scope for prototype |
+| Approach                 | Description                                                                                                  | Trade-off                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Session-Based Auth       | Server stores session state; client sends session cookie                                                     | Requires shared session store (Redis) to work across multiple server instances; statefulness complicates horizontal scaling |
+| **JWT (Stateless)**      | Server issues signed token; client includes it in every request; server verifies signature without DB lookup | Stateless; scales horizontally; revocation requires a blacklist or short TTL                                                |
+| OAuth 2.0 + Social Login | Delegate auth to Google/GitHub                                                                               | Good UX but complex integration; out of scope for prototype                                                                 |
 
 Given that UniCompass is a prototype and the team desired a clean, minimal authentication mechanism without requiring a session store (Redis is already used for caching, not authentication), stateless JWT was chosen.
 
@@ -620,17 +622,17 @@ We will use **JWT (JSON Web Tokens) with HS256 signing** for authentication:
 
 ## Summary
 
-| Section | Coverage |
-|---------|----------|
-| **IEEE 42010 Stakeholders** | 7 stakeholders identified (SH1–SH7) |
-| **Stakeholder Concerns** | Concerns mapped per stakeholder |
-| **Viewpoints** | 5 viewpoints defined (VP-1 to VP-5) |
-| **Views** | 5 views provided (Functional, Data, Deployment, Behavioral, Performance) |
-| **ADR-001** | FastAPI as backend framework |
-| **ADR-002** | Facade + Adapter pattern for ingestion |
-| **ADR-003** | PostgreSQL + pgvector for unified storage |
-| **ADR-004** | Redis for caching + Pub/Sub |
-| **ADR-005** | JWT stateless authentication |
+| Section                     | Coverage                                                                 |
+| --------------------------- | ------------------------------------------------------------------------ |
+| **IEEE 42010 Stakeholders** | 7 stakeholders identified (SH1–SH7)                                      |
+| **Stakeholder Concerns**    | Concerns mapped per stakeholder                                          |
+| **Viewpoints**              | 5 viewpoints defined (VP-1 to VP-5)                                      |
+| **Views**                   | 5 views provided (Functional, Data, Deployment, Behavioral, Performance) |
+| **ADR-001**                 | FastAPI as backend framework                                             |
+| **ADR-002**                 | Facade + Adapter pattern for ingestion                                   |
+| **ADR-003**                 | PostgreSQL + pgvector for unified storage                                |
+| **ADR-004**                 | Redis for caching + Pub/Sub                                              |
+| **ADR-005**                 | JWT stateless authentication                                             |
 
 
 
@@ -660,12 +662,12 @@ This is the single most impactful tactic for UniCompass because the Discovery Fe
 
 **Tactic Applied In UniCompass:**
 
-| Cache Layer | Redis Key Pattern | TTL | Invalidation Trigger |
-|-------------|-------------------|-----|----------------------|
-| Discovery Feed | `feed:{category}:{active}:{limit}:{offset}` | 5 min (300s) | Ingestion worker completion |
-| Single Opportunity | `opportunity:{item_id}` | 30 min (1800s) | Time-based expiry |
-| User Profile | `profile:{user_id}` | 1 hour (3600s) | Resume re-upload |
-| External API Raw | `source:{name}:latest` | 30 min | Time-based expiry |
+| Cache Layer        | Redis Key Pattern                           | TTL            | Invalidation Trigger        |
+| ------------------ | ------------------------------------------- | -------------- | --------------------------- |
+| Discovery Feed     | `feed:{category}:{active}:{limit}:{offset}` | 5 min (300s)   | Ingestion worker completion |
+| Single Opportunity | `opportunity:{item_id}`                     | 30 min (1800s) | Time-based expiry           |
+| User Profile       | `profile:{user_id}`                         | 1 hour (3600s) | Resume re-upload            |
+| External API Raw   | `source:{name}:latest`                      | 30 min         | Time-based expiry           |
 
 **Graceful Degradation:** All Redis calls are wrapped in `try/except`. If Redis is unavailable, the system falls back transparently to PostgreSQL — ensuring availability is never sacrificed for performance.
 
@@ -827,13 +829,13 @@ This tactic directly addresses NFR-3 and is what distinguishes UniCompass from a
 
 #### 2.1 Pattern Overview
 
-| Attribute | Details |
-|-----------|---------|
-| **Pattern Family** | Structural (Gang of Four) |
-| **Pattern Names** | Facade (GoF) + Adapter (GoF) — used together |
-| **Problem Solved** | How to aggregate opportunity data from N heterogeneous external sources (RSS XML, Adzuna JSON, Jooble JSON, Semantic Scholar JSON) into a single, normalized data model without coupling business logic to each source's schema |
-| **Component Where Applied** | Ingestion Engine — `AggregatorFacade`, `OpportunityAdapter`, `RSSAdapter`, `AdzunaAdapter`, `JoobleAdapter` |
-| **NFR Addressed** | NFR-2 Scalability (new sources = new adapter, zero existing changes); NFR-4 Availability (per-adapter fault isolation) |
+| Attribute                   | Details                                                                                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pattern Family**          | Structural (Gang of Four)                                                                                                                                                                                                       |
+| **Pattern Names**           | Facade (GoF) + Adapter (GoF) — used together                                                                                                                                                                                    |
+| **Problem Solved**          | How to aggregate opportunity data from N heterogeneous external sources (RSS XML, Adzuna JSON, Jooble JSON, Semantic Scholar JSON) into a single, normalized data model without coupling business logic to each source's schema |
+| **Component Where Applied** | Ingestion Engine — `AggregatorFacade`, `OpportunityAdapter`, `RSSAdapter`, `AdzunaAdapter`, `JoobleAdapter`                                                                                                                     |
+| **NFR Addressed**           | NFR-2 Scalability (new sources = new adapter, zero existing changes); NFR-4 Availability (per-adapter fault isolation)                                                                                                          |
 
 #### 2.2 How The Pattern Works In UniCompass
 
@@ -867,17 +869,33 @@ Adding **Semantic Scholar** as a new source requires:
 
 ---
 
+#### 2.6 C4 Model Diagrams — Facade + Adapter Pattern
+
+> **C4 Level 1 — System Context:** Positions UniCompass within its environment — who uses it and which external systems it depends on for opportunity data.
+
+![C4 L1 System Context — Data Ingestion (Facade + Adapter)](c4_facade_l1_context.png)
+
+> **C4 Level 2 — Container Diagram:** Shows the top-level deployable units (Frontend, Backend, Ingestion Engine, PostgreSQL, Redis) and how they communicate during an ingestion cycle.
+
+![C4 L2 Container — Ingestion Pipeline (Facade + Adapter)](c4_facade_l2_container.png)
+
+> **C4 Level 3 — Component Diagram:** Zooms into the Ingestion Engine, showing `AggregatorFacade`, the `OpportunityAdapter` interface, three concrete adapters, and the `NormalizedRssItem` canonical schema.
+
+![C4 L3 Component — Ingestion Engine (Facade + Adapter)](c4_facade_l3_component.png)
+
+---
+
 ### Pattern 2 — Observer / Publish-Subscribe Pattern (Real-Time Notifications)
 
 #### 2.6 Pattern Overview
 
-| Attribute | Details |
-|-----------|---------|
-| **Pattern Family** | Behavioural (Gang of Four) / Architectural (Event-Driven) |
-| **Pattern Names** | Observer (GoF) + Publish-Subscribe (Architectural) |
-| **Problem Solved** | How to push time-sensitive opportunity alerts to users in real-time without polling, without coupling the ingestion worker to individual WebSocket connections, and without blocking the data pipeline |
-| **Component Where Applied** | Notification Service — Redis Pub/Sub broker + FastAPI WebSocket endpoint |
-| **NFR Addressed** | NFR-4 Availability (decoupled delivery); NFR-1 Performance (push model, ~50ms delivery vs polling's N-second delay) |
+| Attribute                   | Details                                                                                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Pattern Family**          | Behavioural (Gang of Four) / Architectural (Event-Driven)                                                                                                                                              |
+| **Pattern Names**           | Observer (GoF) + Publish-Subscribe (Architectural)                                                                                                                                                     |
+| **Problem Solved**          | How to push time-sensitive opportunity alerts to users in real-time without polling, without coupling the ingestion worker to individual WebSocket connections, and without blocking the data pipeline |
+| **Component Where Applied** | Notification Service — Redis Pub/Sub broker + FastAPI WebSocket endpoint                                                                                                                               |
+| **NFR Addressed**           | NFR-4 Availability (decoupled delivery); NFR-1 Performance (push model, ~50ms delivery vs polling's N-second delay)                                                                                    |
 
 #### 2.7 How The Pattern Works In UniCompass
 
@@ -900,43 +918,78 @@ The classic **Observer** pattern defines a one-to-many dependency such that when
 #### 2.10 UML Sequence Diagram — WebSocket Connection Lifecycle
 ![Observer / Pub-Sub Pattern](pubsubseq.png)
 
+---
+
+#### 2.11 C4 Model Diagrams — Observer / Pub-Sub Pattern
+
+> **C4 Level 1 — System Context:** Shows the student receiving real-time push alerts from UniCompass, and the external data sources that trigger new opportunity events.
+
+![C4 L1 System Context — Real-Time Notifications (Observer / Pub-Sub)](c4_pubsub_l1_context.png)
+
+> **C4 Level 2 — Container Diagram:** Maps the Publisher (Ingestion Worker), Broker (Redis Pub/Sub), Observer (WebSocket Server), and Frontend containers and the event flow between them.
+
+![C4 L2 Container — Real-Time Notification (Observer / Pub-Sub)](c4_pubsub_l2_container.png)
+
+> **C4 Level 3 — Component Diagram:** Zooms into the Notification Service, showing `IngestionWorker` (Subject), `Redis Pub/Sub Channel` (Broker), `WebSocket Handler` (Observer), and `NotificationManager` (Connection Registry).
+
+![C4 L3 Component — Notification Service (Observer / Pub-Sub)](c4_pubsub_l3_component.png)
+
+---
+
 ### Pattern 3 (Supporting) — Strategy Pattern (Feed Sorting)
 
 #### 2.11 Overview
 
 The **Strategy** pattern is used to make the feed sorting algorithm a first-class, swappable concern. Instead of a giant `if sort == "latest": ... elif sort == "relevant": ...` block in the route handler, each sorting algorithm is encapsulated in its own class implementing a common interface.
 
-| Strategy | Trigger | Algorithm |
-|----------|---------|-----------|
-| `LatestSortStrategy` | `sort=latest` (default) | `ORDER BY published_at DESC` in PostgreSQL |
+| Strategy                | Trigger                            | Algorithm                                                                |
+| ----------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| `LatestSortStrategy`    | `sort=latest` (default)            | `ORDER BY published_at DESC` in PostgreSQL                               |
 | `RelevanceSortStrategy` | `sort=relevant` (requires profile) | pgvector `<=>` cosine similarity operator against user profile embedding |
 
 #### 2.12 UML Class Diagram — Strategy Pattern
 
 ![Strategy Pattern](strategy.png)
+
+---
+
+#### 2.13 C4 Model Diagrams — Strategy Pattern
+
+> **C4 Level 1 — System Context:** Shows the student requesting a personalised or chronological feed, and UniCompass's dependency on Gemini for the profile embedding that powers relevance ranking.
+
+![C4 L1 System Context — Feed Sorting (Strategy Pattern)](c4_strategy_l1_context.png)
+
+> **C4 Level 2 — Container Diagram:** Shows the FastAPI Backend selecting a sort strategy at runtime, with Redis as the cache layer and PostgreSQL (HNSW index) as the data store.
+
+![C4 L2 Container — Feed Delivery (Strategy Pattern)](c4_strategy_l2_container.png)
+
+> **C4 Level 3 — Component Diagram:** Reveals `FeedRouter` (client), `FeedService` (context), `SortStrategy` (interface), `LatestSortStrategy` and `RelevanceSortStrategy` (concrete strategies), and `RedisCacheService` (cache decorator).
+
+![C4 L3 Component — Feed Service (Strategy Pattern)](c4_strategy_l3_component.png)
+
 ---
 
 ## Summary Table
 
 ### Architectural Tactics
 
-| # | Tactic | Category (Bass et al.) | NFR Addressed | Key Mechanism |
-|---|--------|----------------------|---------------|---------------|
-| 1 | **Cache-Aside (Redis)** | Performance | NFR-1 < 200 ms | Redis key-value store; TTL-based expiry; event-driven invalidation |
-| 2 | **Async Background Processing** | Scalability | NFR-2 Scalability | `asyncio.Task` workers decoupled from API thread; non-blocking I/O |
-| 3 | **Fault Isolation** | Availability | NFR-4 Availability | Per-adapter `try/except`; Redis fallback to DB; graceful degradation |
-| 4 | **URL-Based Deduplication** | Data Integrity | NFR-5 Deduplication | In-memory `set` + DB `UNIQUE` constraint + `ON CONFLICT DO NOTHING` |
-| 5 | **Semantic Vector Indexing** | Accuracy / Modifiability | NFR-3 Relevance | `all-MiniLM-L6-v2` embeddings + pgvector HNSW cosine similarity |
+| #   | Tactic                          | Category (Bass et al.)   | NFR Addressed       | Key Mechanism                                                        |
+| --- | ------------------------------- | ------------------------ | ------------------- | -------------------------------------------------------------------- |
+| 1   | **Cache-Aside (Redis)**         | Performance              | NFR-1 < 200 ms      | Redis key-value store; TTL-based expiry; event-driven invalidation   |
+| 2   | **Async Background Processing** | Scalability              | NFR-2 Scalability   | `asyncio.Task` workers decoupled from API thread; non-blocking I/O   |
+| 3   | **Fault Isolation**             | Availability             | NFR-4 Availability  | Per-adapter `try/except`; Redis fallback to DB; graceful degradation |
+| 4   | **URL-Based Deduplication**     | Data Integrity           | NFR-5 Deduplication | In-memory `set` + DB `UNIQUE` constraint + `ON CONFLICT DO NOTHING`  |
+| 5   | **Semantic Vector Indexing**    | Accuracy / Modifiability | NFR-3 Relevance     | `all-MiniLM-L6-v2` embeddings + pgvector HNSW cosine similarity      |
 
 ---
 
 ### Design Patterns
 
-| # | Pattern | GoF Category | Role In UniCompass | UML Diagram |
-|---|---------|-------------|-------------------|-------------|
-| 1 | **Facade + Adapter** | Structural | Unifies N heterogeneous external opportunity sources into one `fetch_all_opportunities()` call | Class + Sequence |
-| 2 | **Observer / Pub-Sub** | Behavioural | Decouples ingestion worker from WebSocket notification delivery via Redis broker | Class + 2× Sequence |
-| 3 | **Strategy** (supporting) | Behavioural | Encapsulates feed sorting algorithms (latest vs. relevant) as interchangeable policies | Class |
+| #   | Pattern                   | GoF Category | Role In UniCompass                                                                             | UML Diagram         |
+| --- | ------------------------- | ------------ | ---------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | **Facade + Adapter**      | Structural   | Unifies N heterogeneous external opportunity sources into one `fetch_all_opportunities()` call | Class + Sequence    |
+| 2   | **Observer / Pub-Sub**    | Behavioural  | Decouples ingestion worker from WebSocket notification delivery via Redis broker               | Class + 2× Sequence |
+| 3   | **Strategy** (supporting) | Behavioural  | Encapsulates feed sorting algorithms (latest vs. relevant) as interchangeable policies         | Class               |
 
 ---
 
@@ -1130,9 +1183,9 @@ Max                |              0.79 ms |             85.11 ms |          7887
 #### NFR-1 Compliance Analysis
 
 ```text
-Cache Hit (Arch A):      p95 = 4.31 ms     ✅  Instantaneous
-Cache Miss (Arch A):     p95 = 294.89 ms   ❌  Exceeds NFR target by 47.5%
-Alternative (Arch B):   Mean = ~90,700 ms  ❌  Catastrophic failure (HTTP Timeout)
+Cache Hit (Arch A):      p95 = 4.31 ms     [PASS]  Instantaneous
+Cache Miss (Arch A):     p95 = 294.89 ms   [FAIL]  Exceeds NFR target by 47.5%
+Alternative (Arch B):   Mean = ~90,700 ms  [FAIL]  Catastrophic failure (HTTP Timeout)
 ```
 
 **Key insight — avoiding synchronous network boundaries.** The Cache-Aside architecture safely degrades to a 294 ms response on a cache miss (hitting the local PostgreSQL DB). However, Architecture B (Synchronous Monolith) takes over 90 seconds to execute because it must wait for 20+ internet sources to respond. 
@@ -1150,16 +1203,16 @@ This proves that without asynchronous background ingestion, the application is f
 
 | Metric         | Cache Hit (Architecture A) | Cache Miss (Architecture A) | Alternative (Sync Monolith) |
 | -------------- | -------------------------- | --------------------------- | --------------------------- |
-| **Throughput** | **279.94 req/s**           | 16.65 req/s                  | 0.01 req/s                  |
+| **Throughput** | **279.94 req/s**           | 16.65 req/s                 | 0.01 req/s                  |
 
 > Source: `docs/benchmark_results.json`
 
 #### NFR-2 Compliance Analysis
 
 ```text
-Cache Hit (Arch A):      279.96 req/s  ✅  Handles lecture-hour traffic spikes
-Cache Miss (Arch A):       4.59 req/s  ⚠️  Safe fallback, but slow under heavy load
-Alternative (Arch B):      0.01 req/s  ❌  Cannot handle even 1 concurrent user
+Cache Hit (Arch A):      279.96 req/s  [PASS]  Handles lecture-hour traffic spikes
+Cache Miss (Arch A):       4.59 req/s  [WARN]  Safe fallback, but slow under heavy load
+Alternative (Arch B):      0.01 req/s  [FAIL]  Cannot handle even 1 concurrent user
 ```
 
 **Interpretation:** At 0.01 req/s, Architecture B (Sync Monolith) cannot support a single user without timing out. Even if we rely purely on our PostgreSQL database (Cache Miss), throughput drops to 4.59 req/s, which would cause queuing during a typical 50-student lecture break. Architecture A scales linearly with Redis — since the hot path is a single network round-trip (< 5 ms), one Uvicorn worker can easily serve 200+ concurrent users without thread starvation.
@@ -1181,17 +1234,17 @@ Every architectural decision involves trade-offs. The quantitative gains above h
 
 ### 5.1 Trade-off Table
 
-| Quality Attribute                | Architecture A (Cache-Aside, Event-Driven)               | Architecture B (Synchronous Layered)        | Winner  |
-| -------------------------------- | -------------------------------------------------------- | ------------------------------------------- | ------- |
-| **Response Time (NFR-1)**        | p95: 4.31 ms ✅                                           | Mean: ~90,700 ms ❌                          | **A**   |
-| **Throughput (NFR-2)**           | 279.96 req/s ✅                                           | 0.01 req/s ❌                                | **A**   |
-| **Data Freshness / Consistency** | Eventual (up to 5 min stale) ⚠️                           | Strong (always live) ✅                      | **B**   |
-| **Infrastructure Complexity**    | Redis + asyncio workers + invalidation logic ❌           | Single DB, no caching layer ✅               | **B**   |
-| **Fault Tolerance**              | Per-adapter isolation; Redis fallback ✅                  | Single Jooble timeout = broken feed ❌       | **A**   |
-| **Operational Cost**             | 2× services (Postgres + Redis) in Docker ⚠️               | 1× service (Postgres only) ✅                | **B**   |
-| **Debugging Complexity**         | Distributed: must trace worker logs + Redis state + DB ❌ | Linear call stack, easy to follow ✅         | **B**   |
-| **External API Budget**          | O(1) API calls/day regardless of user count ✅            | O(N × sessions) API calls/day ❌             | **A**   |
-| **Extensibility (new sources)**  | New adapter class, zero other changes ✅                  | Same (pattern is independent of sync/async) | **Tie** |
+| Quality Attribute                | Architecture A (Cache-Aside, Event-Driven)                    | Architecture B (Synchronous Layered)        | Winner  |
+| -------------------------------- | ------------------------------------------------------------- | ------------------------------------------- | ------- |
+| **Response Time (NFR-1)**        | p95: 4.31 ms [PASS]                                           | Mean: ~90,700 ms [FAIL]                     | **A**   |
+| **Throughput (NFR-2)**           | 279.96 req/s [PASS]                                           | 0.01 req/s [FAIL]                           | **A**   |
+| **Data Freshness / Consistency** | Eventual (up to 5 min stale) [WARN]                           | Strong (always live) [PASS]                 | **B**   |
+| **Infrastructure Complexity**    | Redis + asyncio workers + invalidation logic [FAIL]           | Single DB, no caching layer [PASS]          | **B**   |
+| **Fault Tolerance**              | Per-adapter isolation; Redis fallback [PASS]                  | Single Jooble timeout = broken feed [FAIL]  | **A**   |
+| **Operational Cost**             | 2× services (Postgres + Redis) in Docker [WARN]               | 1× service (Postgres only) [PASS]           | **B**   |
+| **Debugging Complexity**         | Distributed: must trace worker logs + Redis state + DB [FAIL] | Linear call stack, easy to follow [PASS]    | **B**   |
+| **External API Budget**          | O(1) API calls/day regardless of user count [PASS]            | O(N × sessions) API calls/day [FAIL]        | **A**   |
+| **Extensibility (new sources)**  | New adapter class, zero other changes [PASS]                  | Same (pattern is independent of sync/async) | **Tie** |
 
 ---
 
@@ -1264,9 +1317,25 @@ Architecture B has no such failure mode — it has no in-memory state beyond the
 | Section                    | Content                                                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **Architectures Compared** | A: Hybrid Event-Driven Cache-Aside (implemented) vs. B: Synchronous N-Tier Layered (alternative)              |
-| **NFR-1: Response Time**   | A: p95 = 4.31 ms ✅ vs. B: Mean = ~90,700 ms ❌ — **26,000× improvement**                                        |
-| **NFR-2: Throughput**      | A: 279.96 req/s ✅ vs. B: 0.01 req/s ❌ — **27,000× improvement**                                               |
+| **NFR-1: Response Time**   | A: p95 = 4.31 ms [PASS] vs. B: Mean = ~90,700 ms [FAIL] — **26,000× improvement**                             |
+| **NFR-2: Throughput**      | A: 279.96 req/s [PASS] vs. B: 0.01 req/s [FAIL] — **27,000× improvement**                                     |
 | **Trade-off 1**            | Eventual consistency (5 min staleness) vs. sub-5 ms response time — acceptable for campus discovery           |
 | **Trade-off 2**            | Async worker debugging complexity vs. 27,000× throughput gain — managed via structured logging                |
 | **Trade-off 3**            | Redis infrastructure footprint vs. fault-tolerant, rate-limit-safe delivery — mitigated via graceful fallback |
 | **Benchmark Source**       | `docs/benchmark_results.json` — 20 requests × 2 scenarios, custom Python harness                              |
+
+---
+
+# Contributions
+
+## Team 18 — Contribution Summary
+
+This section documents the individual contributions of each team member across all project tasks.
+
+| Member        | Contributions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Nikhilesh** | **Implementation:** Project setup & database schema design, User authentication (JWT, bcrypt, registration/login endpoints), RSS Ingestion Engine (RSS adapter, background ingestion worker). **Documentation:** Task 1 — Requirements & Subsystems (Functional Requirements, Architecturally Significant Requirements). **Architecture:** Task 3 — Architectural Tactics (Cache-Aside, Async Background Processing, Fault Isolation) and Facade + Adapter pattern (implementation & C4 diagrams). Task 4 — Architecture Comparison (trade-off deep-dives, quantitative NFR analysis, benchmark scripting). |
+| **Sanjana**   | **Implementation:** RSS Ingestion Engine (feed parser integration, multi-source RSS adapter, deduplication logic). **Documentation:** Task 1 — Requirements & Subsystems (Non-Functional Requirements, Subsystem Overview). **Architecture:** Task 3 — Supporting contributions to Tactic 4 (URL-Based Deduplication) and ingestion pipeline documentation. Task 4 — Architecture Comparison (Synchronous N-Tier Layered architecture description, Architecture B sequence diagram, "When to Choose" analysis).                                                                                             |
+| **Nikhil**    | **Implementation:** Discovery Feed API & Frontend (feed endpoints, category filtering, pagination, Next.js UI), Resume Upload & AI Profile Builder (PDF parsing with PyMuPDF, Gemini API integration, profile extraction). **Documentation:** Task 4 — Architecture Comparison (Architecture B diagrams, trade-off table, "When to Choose" section), overall report documentation and formatting. **Architecture:** Task 2 — Architecture Framework (ADR-001 FastAPI, ADR-002 Facade+Adapter, ADR-005 JWT).                                                                                                 |
+| **Srinivas**  | **Implementation:** Resume Upload & AI Profile Builder (structured profile storage, profile embedding generation, profile cache invalidation). **Architecture:** Task 3 — Observer / Pub-Sub pattern (UML class & sequence diagrams, C4 diagrams), Strategy Pattern (UML & C4 diagrams), Tactic 5 (Semantic Vector Indexing).                                                                                                                                                                                                                                                                               |
+| **Bharghav**  | **Implementation:** Caching with Redis (feed/profile/opportunity cache layers, TTL strategy, cache invalidation), Integration & Testing (end-to-end testing, benchmark scripting, Docker Compose setup). **Documentation:** Task 2 — Architecture Framework (Information/Data View, Behavioral/Process View, Performance/Caching View, ADR-003 pgvector, ADR-004 Redis), overall report documentation and formatting. **Architecture:** Task 4 — Architecture Comparison (Architecture A sequence & component diagrams, quantitative NFR analysis, benchmark results).                                      |

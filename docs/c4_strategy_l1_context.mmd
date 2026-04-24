@@ -1,0 +1,11 @@
+C4Context
+    title Level 1: System Context — Feed Sorting (Strategy Pattern)
+
+    Person(student, "Student", "Requests the discovery feed sorted either by recency (latest) or by personal AI relevance (relevant)")
+
+    System(unicompass, "UniCompass", "Selects and executes the optimal feed-sorting algorithm at runtime based on the user's preference parameter. Supports chronological ranking and AI-powered semantic similarity ranking interchangeably via the Strategy pattern.")
+
+    System_Ext(gemini, "Google Gemini API", "Extracts structured skills and interests from an uploaded PDF resume, which are used to build the user profile embedding for relevance ranking")
+
+    Rel(student, unicompass, "GET /api/feed?sort=latest or sort=relevant", "HTTPS")
+    Rel(unicompass, gemini, "POST resume text for structured skill extraction", "HTTPS / REST")

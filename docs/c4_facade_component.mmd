@@ -1,0 +1,32 @@
+C4Component
+    title Component Diagram — Ingestion Engine (Facade + Adapter)
+
+    Container_Boundary(ingestion, "Ingestion Engine") {
+        Component(facade, "AggregatorFacade", "Python Class", "Single entry point: fetch_all_opportunities(). Orchestrates all adapters, merges results, deduplicates by source URL")
+        Component(iface, "OpportunityAdapter", "Python ABC", "Abstract base class defining the fetch_opportunities() contract")
+        Component(rss_adp, "RSSAdapter", "Python Class", "Parses Feedparser FeedParserDict entries into NormalizedRssItem")
+        Component(adzuna_adp, "AdzunaAdapter", "Python Class", "Translates Adzuna JSON results into NormalizedRssItem")
+        Component(jooble_adp, "JoobleAdapter", "Python Class", "Translates Jooble JSON jobs into NormalizedRssItem")
+        Component(schema, "NormalizedRssItem", "Pydantic Model", "Canonical data schema: title, url, source, category, published_at, embedding")
+    }
+
+    Container(worker, "Background Worker", "asyncio.Task", "Calls AggregatorFacade and upserts results")
+    ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "rss_items table")
+    System_Ext(adzuna, "Adzuna API")
+    System_Ext(jooble, "Jooble API")
+    System_Ext(rss_feeds, "RSS Feeds (XML)")
+
+    Rel(worker, facade, "Calls", "fetch_all_opportunities()")
+    Rel(facade, rss_adp, "Delegates to")
+    Rel(facade, adzuna_adp, "Delegates to")
+    Rel(facade, jooble_adp, "Delegates to")
+    Rel(rss_adp, iface, "Implements")
+    Rel(adzuna_adp, iface, "Implements")
+    Rel(jooble_adp, iface, "Implements")
+    Rel(rss_adp, schema, "Produces")
+    Rel(adzuna_adp, schema, "Produces")
+    Rel(jooble_adp, schema, "Produces")
+    Rel(rss_adp, rss_feeds, "HTTP GET", "Feedparser")
+    Rel(adzuna_adp, adzuna, "HTTP GET", "requests")
+    Rel(jooble_adp, jooble, "HTTP POST", "requests")
+    Rel(facade, postgres, "Upserts via worker", "SQLAlchemy")

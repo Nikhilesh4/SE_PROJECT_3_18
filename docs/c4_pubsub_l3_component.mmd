@@ -1,0 +1,18 @@
+C4Component
+    title Level 3: Component Diagram — Notification Service (Observer / Pub-Sub)
+
+    Container_Boundary(notif, "Notification Service") {
+        Component(ingestion_worker, "IngestionWorker", "Concrete Subject — Publisher", "After ingestion, computes cosine similarity between each new opportunity and all user profile vectors. For matches above threshold: calls Redis PUBLISH on the user-specific channel.")
+        Component(redis_channel, "Redis Pub/Sub Channel", "Event Broker — notifications:{user_id}", "Per-user channel completely decouples Publisher from all Observers. Queues events asynchronously so ingestion never blocks waiting for WebSocket delivery.")
+        Component(ws_server, "WebSocket Handler", "Concrete Observer — Subscriber", "On client connect: calls SUBSCRIBE on the user-specific Redis channel. On event: deserialises the JSON payload and writes it to the open WebSocket connection.")
+        Component(notif_manager, "NotificationManager", "Connection Registry", "Maintains an in-memory dictionary of user_id to active WebSocket connection. Handles connect, disconnect, and per-user message routing.")
+    }
+
+    Container(frontend, "Next.js Frontend", "React", "Receives WebSocket push events; increments badge counter; shows toast notification")
+    ContainerDb(postgres, "PostgreSQL", "pgvector", "User profile and opportunity embeddings for relevance scoring")
+
+    Rel(ingestion_worker, postgres, "Reads embeddings", "Cosine similarity query via pgvector")
+    Rel(ingestion_worker, redis_channel, "PUBLISH match event", "JSON opportunity payload")
+    Rel(redis_channel, ws_server, "Delivers message", "Async Pub/Sub subscription callback")
+    Rel(ws_server, notif_manager, "Look up connection for user_id")
+    Rel(notif_manager, frontend, "PUSH event", "WebSocket frame")

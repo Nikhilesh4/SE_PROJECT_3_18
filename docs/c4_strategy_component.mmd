@@ -1,0 +1,21 @@
+C4Component
+    title Component Diagram — Feed Service (Strategy Pattern)
+
+    Container_Boundary(api, "FastAPI Backend") {
+        Component(feed_router, "FeedRouter", "FastAPI APIRouter", "Handles GET /api/feed; reads sort= query parameter and selects the appropriate strategy")
+        Component(strategy_iface, "SortStrategy", "Python ABC", "Abstract interface declaring sort(items, user_embedding) -> List[NormalizedRssItem]")
+        Component(latest_strat, "LatestSortStrategy", "Python Class", "Concrete Strategy: ORDER BY published_at DESC via PostgreSQL")
+        Component(relevant_strat, "RelevanceSortStrategy", "Python Class", "Concrete Strategy: pgvector cosine similarity operator against user profile embedding")
+        Component(feed_svc, "FeedService", "Python Class", "Context object: holds reference to selected SortStrategy; delegates sort call")
+    }
+
+    ContainerDb(postgres, "PostgreSQL", "PostgreSQL + pgvector", "rss_items table with HNSW vector index")
+    ContainerDb(redis, "Redis", "Redis 7", "feed:{category}:{sort}:{page} cached responses")
+
+    Rel(feed_router, feed_svc, "Sets strategy", "sort=latest / sort=relevant")
+    Rel(feed_svc, strategy_iface, "Calls sort()")
+    Rel(strategy_iface, latest_strat, "Implemented by")
+    Rel(strategy_iface, relevant_strat, "Implemented by")
+    Rel(latest_strat, postgres, "ORDER BY published_at DESC", "SQLAlchemy")
+    Rel(relevant_strat, postgres, "embedding cosine similarity", "SQLAlchemy + pgvector")
+    Rel(feed_router, redis, "Cache GET / SET", "async-redis")

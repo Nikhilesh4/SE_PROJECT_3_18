@@ -1,0 +1,18 @@
+C4Container
+    title Level 2: Container Diagram — Real-Time Notification (Observer / Pub-Sub)
+
+    Person(student, "Student", "Connected browser client waiting for alerts")
+
+    System_Boundary(unicompass, "UniCompass") {
+        Container(ingestion, "Ingestion Worker", "Python asyncio.Task — Publisher", "After each ingestion cycle, scores new opportunities against all user profile embeddings. Publishes a JSON match event to Redis for each high-relevance match.")
+        ContainerDb(redis, "Redis", "Redis 7 — Event Broker", "Pub/Sub channel per user: notifications:{user_id}. Fully decouples Publisher from Observers. Queues events for offline users.")
+        Container(ws_handler, "WebSocket Server", "FastAPI /ws/notifications — Observer", "On connect: subscribes to the user-specific Redis channel. On event received: forwards the JSON payload over the open WebSocket connection to the browser.")
+        Container(frontend, "Next.js Frontend", "React", "Renders notification bell badge. Displays toast alert on incoming WebSocket push message.")
+        ContainerDb(postgres, "PostgreSQL", "PostgreSQL + pgvector", "Stores user profile embeddings and opportunity vectors used for relevance scoring")
+    }
+
+    Rel(ingestion, postgres, "Reads user and opportunity embeddings for scoring", "SQLAlchemy / cosine similarity")
+    Rel(ingestion, redis, "PUBLISH notifications:{user_id}", "async-redis / JSON payload")
+    Rel(redis, ws_handler, "Delivers message to subscriber", "Pub/Sub callback")
+    Rel(ws_handler, frontend, "Pushes JSON event", "WebSocket")
+    Rel(student, frontend, "Views real-time alerts", "Browser")

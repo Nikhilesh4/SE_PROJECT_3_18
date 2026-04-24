@@ -1,0 +1,17 @@
+C4Container
+    title Level 2: Container Diagram — Feed Delivery (Strategy Pattern)
+
+    Person(student, "Student", "Requests feed with a sort preference")
+
+    System_Boundary(unicompass, "UniCompass") {
+        Container(frontend, "Next.js Frontend", "React / Next.js", "Renders sorted discovery feed. Sends sort query param (latest or relevant) based on user toggle.")
+        Container(api, "FastAPI Backend", "Python / FastAPI", "FeedRouter reads sort param, selects the correct SortStrategy, and delegates execution to FeedService.")
+        ContainerDb(postgres, "PostgreSQL", "PostgreSQL + pgvector", "rss_items table with HNSW vector index on embedding column for sub-linear similarity search")
+        ContainerDb(redis, "Redis", "Redis 7", "Caches sorted feed responses keyed as feed:{category}:{sort}:{page} with 5-minute TTL")
+    }
+
+    Rel(student, frontend, "Requests feed with sort preference", "HTTPS")
+    Rel(frontend, api, "GET /api/feed?sort=latest|relevant", "REST / JSON")
+    Rel(api, redis, "Check cache: HIT returns immediately", "async-redis GET")
+    Rel(api, postgres, "Cache MISS: query with chosen strategy", "SQLAlchemy + pgvector")
+    Rel(api, redis, "Store result after DB query", "async-redis SET TTL=300")

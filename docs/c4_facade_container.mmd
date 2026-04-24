@@ -1,0 +1,26 @@
+C4Container
+    title Container Diagram — Ingestion Pipeline (Facade + Adapter Pattern)
+
+    Person(student, "Student", "Browses the discovery feed")
+
+    System_Boundary(unicompass, "UniCompass Platform") {
+        Container(frontend, "Next.js Frontend", "React / Next.js", "Renders the discovery feed UI")
+        Container(api, "FastAPI Backend", "Python / FastAPI", "Exposes REST endpoints; orchestrates all services")
+        Container(ingestion, "Ingestion Engine", "Python asyncio Task", "AggregatorFacade + Adapters; polls external sources periodically")
+        ContainerDb(postgres, "PostgreSQL", "PostgreSQL + pgvector", "Primary store: rss_items, users, embeddings")
+        ContainerDb(redis, "Redis", "Redis 7", "Cache layer; Pub/Sub broker")
+    }
+
+    System_Ext(adzuna, "Adzuna API", "Third-party job listings REST API")
+    System_Ext(jooble, "Jooble API", "Third-party job listings REST API")
+    System_Ext(rss, "RSS Feeds", "Internshala / HackerEarth / DevPost XML feeds")
+
+    Rel(student, frontend, "Uses", "HTTPS")
+    Rel(frontend, api, "Calls", "REST / WebSocket")
+    Rel(api, postgres, "Reads/Writes", "SQLAlchemy")
+    Rel(api, redis, "Cache GET/SET", "async-redis")
+    Rel(ingestion, adzuna, "HTTP GET", "REST / JSON")
+    Rel(ingestion, jooble, "HTTP POST", "REST / JSON")
+    Rel(ingestion, rss, "HTTP GET", "Feedparser / XML")
+    Rel(ingestion, postgres, "Upserts", "SQLAlchemy")
+    Rel(ingestion, redis, "Invalidates cache keys", "async-redis")

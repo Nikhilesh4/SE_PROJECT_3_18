@@ -1,0 +1,18 @@
+C4Component
+    title Component Diagram — Notification Service (Observer / Pub-Sub)
+
+    Container_Boundary(notif, "Notification Service") {
+        Component(ingestion_worker, "IngestionWorker", "Python Class", "Concrete Subject / Publisher: calls PUBLISH after scoring each new opportunity against all user embeddings")
+        Component(redis_broker, "Redis Pub/Sub Broker", "Redis Channel", "Event channel keyed notifications:{user_id}; decouples publisher from all observers")
+        Component(ws_server, "WebSocket Server", "FastAPI endpoint", "Concrete Observer: subscribes to the user-specific Redis channel on connection; forwards messages over the open WebSocket")
+        Component(notif_manager, "NotificationManager", "Python Class", "Manages active WebSocket connections; routes incoming messages to the correct client session")
+    }
+
+    Container(frontend, "Next.js Frontend", "React", "Receives push events; updates badge counter")
+    ContainerDb(postgres, "PostgreSQL", "PostgreSQL + pgvector", "User profile embeddings")
+
+    Rel(ingestion_worker, postgres, "Reads", "Cosine similarity")
+    Rel(ingestion_worker, redis_broker, "PUBLISH", "opportunity JSON payload")
+    Rel(redis_broker, ws_server, "Message callback", "Async subscription")
+    Rel(ws_server, notif_manager, "Delegates delivery")
+    Rel(notif_manager, frontend, "PUSH", "WebSocket frame")
