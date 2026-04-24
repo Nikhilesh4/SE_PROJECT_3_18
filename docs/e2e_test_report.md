@@ -4,7 +4,7 @@
 
 This document describes the comprehensive end-to-end (E2E) test suite for the **UniCompass** API platform. The test suite validates all major features and user flows through the full HTTP request → router → service → repository → database pipeline.
 
-**Total Tests: 78 | All Passing ✅**
+**Total Tests: 67 | All Passing ✅**
 
 ---
 
@@ -29,7 +29,7 @@ The E2E tests use a self-contained setup that requires **zero external dependenc
 | `tests/conftest.py` | Shared fixtures, DB engine, Redis stub, TestClient factory |
 | `tests/e2e/test_auth_e2e.py` | Authentication flow tests |
 | `tests/e2e/test_bookmark_e2e.py` | Bookmark CRUD + multi-user isolation |
-| `tests/e2e/test_notification_e2e.py` | Notification lifecycle tests |
+
 | `tests/e2e/test_feed_e2e.py` | Feed endpoint tests |
 | `tests/e2e/test_feed_relevance_e2e.py` | Relevance scoring + Strategy pattern tests |
 | `tests/e2e/test_matching_engine_e2e.py` | Matching engine scoring tests |
@@ -54,14 +54,13 @@ python -m pytest tests/e2e/ -v
 |------------|-------|--------|
 | `test_auth_e2e.py` | 9 | ✅ All Pass |
 | `test_bookmark_e2e.py` | 11 | ✅ All Pass |
-| `test_notification_e2e.py` | 10 | ✅ All Pass |
 | `test_feed_e2e.py` | 8 | ✅ All Pass |
 | `test_feed_relevance_e2e.py` | 15 | ✅ All Pass |
 | `test_matching_engine_e2e.py` | 13 | ✅ All Pass |
-| `test_full_journey_e2e.py` | 4 | ✅ All Pass |
+| `test_full_journey_e2e.py` | 3 | ✅ All Pass |
 | `test_health_e2e.py` | 2 | ✅ All Pass |
 | `test_cache_e2e.py` | 5 | ✅ All Pass |
-| **Total** | **78** | **✅ All Pass** |
+| **Total** | **67** | **✅ All Pass** |
 
 ---
 
@@ -108,26 +107,9 @@ Tests the complete bookmark CRUD lifecycle through the `/api/bookmarks` endpoint
 
 ---
 
-### 3. Notification Flow (`test_notification_e2e.py` — 10 tests)
-
-Tests the notification system lifecycle through the `/api/notifications` endpoints.
-
-| # | Test | Endpoint | What It Validates |
-|---|------|----------|-------------------|
-| 1 | `test_list_notifications_returns_items_and_unread_count` | `GET /api/notifications` | Returns items list + unread_count |
-| 2 | `test_list_notifications_exclude_read` | `GET /api/notifications?include_read=false` | Filters out read notifications |
-| 3 | `test_list_notifications_empty` | `GET /api/notifications` | New user gets empty list with 0 unread |
-| 4 | `test_list_notifications_requires_auth` | `GET /api/notifications` | Unauthenticated returns 401 |
-| 5 | `test_mark_read_success` | `PATCH /api/notifications/{id}/read` | Sets is_read=true and read_at timestamp |
-| 6 | `test_mark_read_nonexistent_returns_404` | `PATCH /api/notifications/{id}/read` | Nonexistent notification returns 404 |
-| 7 | `test_mark_already_read_is_idempotent` | `PATCH /api/notifications/{id}/read` | Marking an already-read notification succeeds |
-| 8 | `test_mark_all_read` | `PATCH /api/notifications/read-all` | Bulk marks all notifications read |
-| 9 | `test_mark_all_read_when_none_exist` | `PATCH /api/notifications/read-all` | Returns updated=0 when no notifications exist |
-| 10 | `test_users_see_only_their_own_notifications` | Multiple endpoints | Multi-user isolation verified |
-
 ---
 
-### 4. Feed Endpoints (`test_feed_e2e.py` — 8 tests)
+### 3. Feed Endpoints (`test_feed_e2e.py` — 8 tests)
 
 Tests the RSS feed API endpoints through the `/api/feeds` routes.
 
@@ -144,7 +126,7 @@ Tests the RSS feed API endpoints through the `/api/feeds` routes.
 
 ---
 
-### 5. Feed Relevance Scoring (`test_feed_relevance_e2e.py` — 15 tests)
+### 4. Feed Relevance Scoring (`test_feed_relevance_e2e.py` — 15 tests)
 
 Tests the relevance scoring algorithm and the Strategy pattern used for feed ranking.
 
@@ -162,7 +144,7 @@ Tests the relevance scoring algorithm and the Strategy pattern used for feed ran
 
 ---
 
-### 6. Matching Engine (`test_matching_engine_e2e.py` — 13 tests)
+### 5. Matching Engine (`test_matching_engine_e2e.py` — 13 tests)
 
 Tests the semantic matching engine that scores opportunities against user profiles.
 
@@ -179,7 +161,7 @@ Tests the semantic matching engine that scores opportunities against user profil
 
 ---
 
-### 7. Full User Journeys (`test_full_journey_e2e.py` — 4 tests)
+### 6. Full User Journeys (`test_full_journey_e2e.py` — 3 tests)
 
 Tests complete multi-step flows that span multiple API domains.
 
@@ -188,11 +170,10 @@ Tests complete multi-step flows that span multiple API domains.
 | 1 | `test_register_bookmark_list_remove` | Register → Bookmark 2 items → List (2) → Remove 1 → Verify (1) → Check IDs | Complete bookmark lifecycle from fresh registration |
 | 2 | `test_register_then_login_then_access` | Register → Login → Access /profile/me | JWT from login works on protected endpoints |
 | 3 | `test_toggle_add_remove_add` | Toggle ×3 → Verify final state | Add-remove-add cycle preserves bookmark |
-| 4 | `test_notification_read_workflow` | Seed 3 → List (unread=3) → Mark 1 read (unread=2) → Mark all read (unread=0) | Complete notification read lifecycle |
 
 ---
 
-### 8. Health & Root (`test_health_e2e.py` — 2 tests)
+### 7. Health & Root (`test_health_e2e.py` — 2 tests)
 
 | # | Test | Endpoint | What It Validates |
 |---|------|----------|-------------------|
@@ -201,7 +182,7 @@ Tests complete multi-step flows that span multiple API domains.
 
 ---
 
-### 9. Cache Service (`test_cache_e2e.py` — 5 tests)
+### 8. Cache Service (`test_cache_e2e.py` — 5 tests)
 
 Tests the Redis cache service operations using the in-memory stub.
 
@@ -236,10 +217,7 @@ Tests the Redis cache service operations using the in-memory stub.
 | `/api/bookmarks/{item_id}` | DELETE | ✅ |
 | `/api/bookmarks` | GET | ✅ |
 | `/api/bookmarks/ids` | GET | ✅ |
-| `/api/notifications` | GET | ✅ |
-| `/api/notifications/{id}/read` | PATCH | ✅ |
-| `/api/notifications/read-all` | PATCH | ✅ |
-| `/ws/notifications` | WebSocket | ⚠️ WebSocket tests require async context |
+
 
 ### Features Covered
 
@@ -261,11 +239,7 @@ Tests the Redis cache service operations using the in-memory stub.
 | Feed Source Summary | ✅ |
 | Cache-Aside Pattern (get/set/delete) | ✅ |
 | Cache Pattern Deletion (bulk invalidation) | ✅ |
-| Notification Listing (with unread count) | ✅ |
-| Notification Read/Unread Filtering | ✅ |
-| Mark Single Notification Read | ✅ |
-| Mark All Notifications Read (bulk) | ✅ |
-| Notification Multi-User Isolation | ✅ |
+
 | Matching Engine Tokenization | ✅ |
 | Matching Engine Score Weights | ✅ |
 | Matching Engine Profile Terms Extraction | ✅ |
@@ -282,7 +256,7 @@ The test suite validates the correct implementation of the following design patt
 |---------|-----------|-------------|
 | **Strategy Pattern** | Feed ranking (`RelevanceFetchStrategy`, `DefaultFetchStrategy`) | `test_feed_relevance_e2e.py` |
 | **Cache-Aside Pattern** | Redis feed/profile caching | `test_cache_e2e.py`, `test_feed_e2e.py` |
-| **Repository Pattern** | `NotificationRepository`, `RssItemRepository` | `test_notification_e2e.py`, `test_bookmark_e2e.py` |
+| **Repository Pattern** | `RssItemRepository` | `test_bookmark_e2e.py` |
 | **Facade Pattern** | `AggregatorFacade` (tested in existing `test_aggregator_facade.py`) | Existing tests |
 | **Observer Pattern** | Event pub/sub + matching engine | `test_matching_engine_e2e.py` |
 | **Singleton Pattern** | `redis_cache`, `cache_service` | `test_cache_e2e.py` |
