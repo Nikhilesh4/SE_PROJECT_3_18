@@ -1,4 +1,3 @@
-
 import time
 import asyncio
 import sys
@@ -111,20 +110,36 @@ def run_benchmarks():
     db_max = db_latencies[-1]
     db_tp = 1000.0 / db_mean
 
-    # 3. Sync Monolith (1 run)
-    sync_lat = benchmark_alternative_sync_aggregator()
-    sync_mean = sync_lat if sync_lat else 0
-    sync_max = sync_lat if sync_lat else 0
-    sync_tp = 1000.0 / sync_lat if sync_lat else 0
+    # 3. Sync Monolith (20 runs)
+    sync_latencies = []
+    print("\n[!] Running Sync Monolith benchmark (20 runs)...")
+    print("    WARNING: This will take a VERY long time and consume external API quota!")
+    for i in range(20):
+        print(f"    -> Run {i+1}/20")
+        lat = benchmark_alternative_sync_aggregator()
+        if lat: sync_latencies.append(lat)
+        time.sleep(2)  # 2-second delay to avoid getting blocked by external APIs
+        
+    if sync_latencies:
+        sync_latencies.sort()
+        n_sync = len(sync_latencies)
+        sync_mean = sum(sync_latencies)/n_sync
+        sync_p50 = statistics.median(sync_latencies)
+        sync_p95 = sync_latencies[int(n_sync * 0.95)]
+        sync_p99 = sync_latencies[min(int(n_sync * 0.99), n_sync - 1)]
+        sync_max = sync_latencies[-1]
+        sync_tp = 1000.0 / sync_mean
+    else:
+        sync_mean = sync_p50 = sync_p95 = sync_p99 = sync_max = sync_tp = 0
 
     print("\n" + "="*90)
     print(f"{'Metric':<18} | {'Cache Hit (Arch A)':<20} | {'Cache Miss (Arch A)':<20} | {'Sync Monolith (Arch B)':<20}")
     print("-" * 90)
     
     print(f"{'Mean':<18} | {hit_mean:>17.2f} ms | {db_mean:>17.2f} ms | {sync_mean:>17.2f} ms")
-    print(f"{'p50 (Median)':<18} | {hit_p50:>17.2f} ms | {db_p50:>17.2f} ms | {'N/A':>20}")
-    print(f"{'p95':<18} | {hit_p95:>17.2f} ms | {db_p95:>17.2f} ms | {'N/A':>20}")
-    print(f"{'p99':<18} | {hit_p99:>17.2f} ms | {db_p99:>17.2f} ms | {'N/A':>20}")
+    print(f"{'p50 (Median)':<18} | {hit_p50:>17.2f} ms | {db_p50:>17.2f} ms | {sync_p50:>17.2f} ms")
+    print(f"{'p95':<18} | {hit_p95:>17.2f} ms | {db_p95:>17.2f} ms | {sync_p95:>17.2f} ms")
+    print(f"{'p99':<18} | {hit_p99:>17.2f} ms | {db_p99:>17.2f} ms | {sync_p99:>17.2f} ms")
     print(f"{'Max':<18} | {hit_max:>17.2f} ms | {db_max:>17.2f} ms | {sync_max:>17.2f} ms")
     print("-" * 90)
     print(f"{'Throughput':<18} | {hit_tp:>14.2f} req/s | {db_tp:>14.2f} req/s | {sync_tp:>14.2f} req/s")

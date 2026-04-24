@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 export interface NormalizedRssItem {
+    id: number | null;
     title: string;
     url: string;
     summary: string;

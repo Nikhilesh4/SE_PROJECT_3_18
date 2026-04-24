@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useFeed } from "@/lib/useFeed";
 import { useAuth } from "@/lib/useAuth";
 import { useProfile } from "@/lib/useProfile";
+import { useBookmarks } from "@/lib/useBookmarks";
 import OpportunityCard from "./OpportunityCard";
 import SourceStatusPanel from "./SourceStatusPanel";
 
@@ -60,6 +61,9 @@ function FeedPageInner() {
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
     const [relevanceMode, setRelevanceMode] = useState(defaultSort);
+
+    // Bookmark state
+    const { isBookmarked, toggleBookmark } = useBookmarks();
 
     const offset = (page - 1) * ITEMS_PER_PAGE;
 
@@ -406,6 +410,8 @@ function FeedPageInner() {
                                                 key={item.guid ?? item.url ?? idx}
                                                 item={item}
                                                 highlightSkills={relevanceMode ? userSkills : []}
+                                                isBookmarked={item.id != null ? isBookmarked(item.id) : false}
+                                                onToggleBookmark={toggleBookmark}
                                             />
                                         ))}
                                     </div>

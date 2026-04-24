@@ -19,6 +19,7 @@ OpportunityCategory = Literal[
 class NormalizedRssItem(BaseModel):
     """Unified shape produced from every feed entry, regardless of origin."""
 
+    id: int | None = None  # DB primary key — used for bookmark operations
     title: str
     url: str
     summary: str = ""

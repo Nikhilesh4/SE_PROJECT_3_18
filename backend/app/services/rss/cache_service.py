@@ -162,6 +162,7 @@ class RssCacheService:
     @staticmethod
     def _row_to_schema(row: RssItem) -> NormalizedRssItem:
         return NormalizedRssItem(
+            id=row.id,
             title=row.title,
             url=row.url,
             summary=row.summary or "",

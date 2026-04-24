@@ -56,6 +56,12 @@ export default function Navbar() {
                                 Feed
                             </Link>
                             <Link
+                                href="/bookmarks"
+                                className="text-slate-700 hover:text-slate-900 transition-colors text-sm font-medium"
+                            >
+                                Bookmarks
+                            </Link>
+                            <Link
                                 href="/profile"
                                 className="text-slate-700 hover:text-slate-900 transition-colors text-sm font-medium"
                             >
