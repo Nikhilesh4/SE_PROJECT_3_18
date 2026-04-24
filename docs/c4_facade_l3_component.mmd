@@ -1,0 +1,32 @@
+C4Component
+    title Level 3: Component Diagram — Ingestion Engine (Facade + Adapter)
+
+    Container_Boundary(ingestion, "Ingestion Engine") {
+        Component(facade, "AggregatorFacade", "Python Class — Facade", "Unified entry point. fetch_all_opportunities() calls every registered adapter, merges results into one list, and deduplicates by source URL.")
+        Component(adapter_iface, "OpportunityAdapter", "Python ABC — Adapter Interface", "Defines the single contract: fetch_opportunities() -> List[NormalizedRssItem]. All concrete adapters must implement this.")
+        Component(rss_adp, "RSSAdapter", "Concrete Adapter", "Implements OpportunityAdapter. Parses Feedparser FeedParserDict entries from Internshala, HackerEarth and DevPost into NormalizedRssItem.")
+        Component(adzuna_adp, "AdzunaAdapter", "Concrete Adapter", "Implements OpportunityAdapter. Calls Adzuna REST API and maps JSON results[] field to NormalizedRssItem.")
+        Component(jooble_adp, "JoobleAdapter", "Concrete Adapter", "Implements OpportunityAdapter. Calls Jooble REST API and maps JSON jobs[] field to NormalizedRssItem.")
+        Component(schema, "NormalizedRssItem", "Pydantic Model — Canonical Schema", "Shared output type: title, url, source, category, published_at, deadline, embedding. Produced by every adapter.")
+    }
+
+    Container(worker, "Background Worker", "asyncio.Task", "Schedules ingestion loop; invokes AggregatorFacade; upserts to DB")
+    ContainerDb(postgres, "PostgreSQL", "rss_items table", "Persists normalised opportunities. UNIQUE constraint on url.")
+    System_Ext(rss_src, "RSS Feeds", "XML / Feedparser")
+    System_Ext(adzuna_src, "Adzuna API", "REST / JSON")
+    System_Ext(jooble_src, "Jooble API", "REST / JSON")
+
+    Rel(worker, facade, "Calls", "fetch_all_opportunities()")
+    Rel(facade, rss_adp, "Delegates to", "fetch_opportunities()")
+    Rel(facade, adzuna_adp, "Delegates to", "fetch_opportunities()")
+    Rel(facade, jooble_adp, "Delegates to", "fetch_opportunities()")
+    Rel(rss_adp, adapter_iface, "Implements")
+    Rel(adzuna_adp, adapter_iface, "Implements")
+    Rel(jooble_adp, adapter_iface, "Implements")
+    Rel(rss_adp, schema, "Produces")
+    Rel(adzuna_adp, schema, "Produces")
+    Rel(jooble_adp, schema, "Produces")
+    Rel(facade, postgres, "Upserts results via worker")
+    Rel(rss_adp, rss_src, "HTTP GET")
+    Rel(adzuna_adp, adzuna_src, "HTTP GET")
+    Rel(jooble_adp, jooble_src, "HTTP POST")

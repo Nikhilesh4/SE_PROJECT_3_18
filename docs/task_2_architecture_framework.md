@@ -98,7 +98,7 @@ Each view corresponds to one viewpoint from the 4+1 model and provides a concret
 
 **Sequence Diagram — Personalized Feed Fetch:**
 
-![Processview](Processview.png)
+![Processview](processview.png)
 
 **Key Highlights:**
 - **Concurrency:** Demonstrates how background ingestion workers operate independently of the user's HTTP request lifecycle.
@@ -139,7 +139,7 @@ Each view corresponds to one viewpoint from the 4+1 model and provides a concret
 > All ADRs follow the **Nygard ADR Template** as described at: https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
 
 
-![Layered](Layered.png)
+![Layered](layered.png)
 
 **Subsystem Responsibilities:**
 

@@ -1,0 +1,18 @@
+C4Container
+    title Container Diagram — Real-Time Notification (Observer / Pub-Sub Pattern)
+
+    Person(student, "Student", "Connected browser client")
+
+    System_Boundary(unicompass, "UniCompass Platform") {
+        Container(ingestion, "Ingestion Worker", "Python asyncio Task", "Publisher: detects high-relevance matches and publishes events")
+        ContainerDb(redis, "Redis", "Redis 7 Pub/Sub", "Event broker: routes notifications:{user_id} channel messages")
+        Container(wshandler, "WebSocket Handler", "FastAPI /ws/notifications", "Observer: subscribes to Redis channel; pushes to browser via WebSocket")
+        Container(frontend, "Next.js Frontend", "React", "Renders notification bell; receives WebSocket push messages")
+        ContainerDb(postgres, "PostgreSQL", "PostgreSQL + pgvector", "Source of opportunity and user profile data")
+    }
+
+    Rel(ingestion, postgres, "Reads embeddings", "Cosine similarity query")
+    Rel(ingestion, redis, "PUBLISH notifications:{user_id}", "async-redis")
+    Rel(redis, wshandler, "Message delivery", "Pub/Sub subscription")
+    Rel(wshandler, frontend, "Push event", "WebSocket")
+    Rel(student, frontend, "Receives alert", "Browser")

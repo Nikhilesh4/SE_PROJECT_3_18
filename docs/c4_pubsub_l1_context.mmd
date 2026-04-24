@@ -1,0 +1,13 @@
+C4Context
+    title Level 1: System Context — Real-Time Notifications (Observer / Pub-Sub)
+
+    Person(student, "Student", "Receives instant push alerts when a newly ingested opportunity matches their skills and interests profile")
+
+    System(unicompass, "UniCompass", "Detects high-relevance opportunity matches and pushes personalised alerts to connected users in under 50 ms via an Observer / Pub-Sub architecture over WebSocket.")
+
+    System_Ext(adzuna, "Adzuna API", "Source of new job opportunity data")
+    System_Ext(rss_feeds, "RSS Feeds", "Source of new internship and hackathon opportunity data")
+
+    Rel(student, unicompass, "Maintains WebSocket connection to receive live alerts", "WSS")
+    Rel(unicompass, adzuna, "Ingests new opportunities from", "HTTP / REST")
+    Rel(unicompass, rss_feeds, "Polls for new opportunities from", "HTTP / Feedparser")

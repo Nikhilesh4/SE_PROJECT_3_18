@@ -1,0 +1,15 @@
+C4Context
+    title Level 1: System Context — Data Ingestion (Facade + Adapter)
+
+    Person(student, "Student", "Discovers job and internship opportunities via the UniCompass feed")
+
+    System(unicompass, "UniCompass", "AI-powered opportunity discovery platform. Aggregates data from N heterogeneous external sources into a unified, normalised feed via the Facade + Adapter pattern.")
+
+    System_Ext(adzuna, "Adzuna API", "Third-party REST API providing job listings in JSON format")
+    System_Ext(jooble, "Jooble API", "Third-party REST API providing job listings in JSON format")
+    System_Ext(rss_feeds, "RSS Feeds", "Internshala / HackerEarth / DevPost XML opportunity feeds")
+
+    Rel(student, unicompass, "Browses discovery feed", "HTTPS")
+    Rel(unicompass, adzuna, "Fetches job listings", "HTTP GET / JSON")
+    Rel(unicompass, jooble, "Fetches job listings", "HTTP POST / JSON")
+    Rel(unicompass, rss_feeds, "Polls for opportunities", "HTTP GET / Feedparser XML")

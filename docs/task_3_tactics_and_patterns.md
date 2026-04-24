@@ -24,12 +24,12 @@ This is the single most impactful tactic for UniCompass because the Discovery Fe
 
 **Tactic Applied In UniCompass:**
 
-| Cache Layer | Redis Key Pattern | TTL | Invalidation Trigger |
-|-------------|-------------------|-----|----------------------|
-| Discovery Feed | `feed:{category}:{active}:{limit}:{offset}` | 5 min (300s) | Ingestion worker completion |
-| Single Opportunity | `opportunity:{item_id}` | 30 min (1800s) | Time-based expiry |
-| User Profile | `profile:{user_id}` | 1 hour (3600s) | Resume re-upload |
-| External API Raw | `source:{name}:latest` | 30 min | Time-based expiry |
+| Cache Layer        | Redis Key Pattern                           | TTL            | Invalidation Trigger        |
+| ------------------ | ------------------------------------------- | -------------- | --------------------------- |
+| Discovery Feed     | `feed:{category}:{active}:{limit}:{offset}` | 5 min (300s)   | Ingestion worker completion |
+| Single Opportunity | `opportunity:{item_id}`                     | 30 min (1800s) | Time-based expiry           |
+| User Profile       | `profile:{user_id}`                         | 1 hour (3600s) | Resume re-upload            |
+| External API Raw   | `source:{name}:latest`                      | 30 min         | Time-based expiry           |
 
 **Graceful Degradation:** All Redis calls are wrapped in `try/except`. If Redis is unavailable, the system falls back transparently to PostgreSQL — ensuring availability is never sacrificed for performance.
 
@@ -191,13 +191,13 @@ This tactic directly addresses NFR-3 and is what distinguishes UniCompass from a
 
 #### 2.1 Pattern Overview
 
-| Attribute | Details |
-|-----------|---------|
-| **Pattern Family** | Structural (Gang of Four) |
-| **Pattern Names** | Facade (GoF) + Adapter (GoF) — used together |
-| **Problem Solved** | How to aggregate opportunity data from N heterogeneous external sources (RSS XML, Adzuna JSON, Jooble JSON, Semantic Scholar JSON) into a single, normalized data model without coupling business logic to each source's schema |
-| **Component Where Applied** | Ingestion Engine — `AggregatorFacade`, `OpportunityAdapter`, `RSSAdapter`, `AdzunaAdapter`, `JoobleAdapter` |
-| **NFR Addressed** | NFR-2 Scalability (new sources = new adapter, zero existing changes); NFR-4 Availability (per-adapter fault isolation) |
+| Attribute                   | Details                                                                                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pattern Family**          | Structural (Gang of Four)                                                                                                                                                                                                       |
+| **Pattern Names**           | Facade (GoF) + Adapter (GoF) — used together                                                                                                                                                                                    |
+| **Problem Solved**          | How to aggregate opportunity data from N heterogeneous external sources (RSS XML, Adzuna JSON, Jooble JSON, Semantic Scholar JSON) into a single, normalized data model without coupling business logic to each source's schema |
+| **Component Where Applied** | Ingestion Engine — `AggregatorFacade`, `OpportunityAdapter`, `RSSAdapter`, `AdzunaAdapter`, `JoobleAdapter`                                                                                                                     |
+| **NFR Addressed**           | NFR-2 Scalability (new sources = new adapter, zero existing changes); NFR-4 Availability (per-adapter fault isolation)                                                                                                          |
 
 #### 2.2 How The Pattern Works In UniCompass
 
@@ -222,6 +222,22 @@ All adapters implement the `OpportunityAdapter` abstract base class (ABC), which
 
 ---
 
+#### 2.5 C4 Model Diagrams (Facade + Adapter)
+
+> **C4 Level 1 — System Context:** Positions UniCompass within its environment — who uses it and which external systems it depends on for opportunity data.
+
+![C4 L1 System Context — Data Ingestion (Facade + Adapter)](c4_facade_l1_context.png)
+
+> **C4 Level 2 — Container Diagram:** Shows the top-level deployable units (Frontend, Backend, Ingestion Engine, PostgreSQL, Redis) and how they communicate during an ingestion cycle.
+
+![C4 L2 Container — Ingestion Pipeline (Facade + Adapter)](c4_facade_l2_container.png)
+
+> **C4 Level 3 — Component Diagram:** Zooms into the Ingestion Engine container, revealing the internal structure: `AggregatorFacade`, the `OpportunityAdapter` interface, three concrete adapters, and the `NormalizedRssItem` output schema.
+
+![C4 L3 Component — Ingestion Engine (Facade + Adapter)](c4_facade_l3_component.png)
+
+---
+
 #### 2.5 Open/Closed Principle: Adding a New Source
 
 Adding **Semantic Scholar** as a new source requires:
@@ -235,13 +251,13 @@ Adding **Semantic Scholar** as a new source requires:
 
 #### 2.6 Pattern Overview
 
-| Attribute | Details |
-|-----------|---------|
-| **Pattern Family** | Behavioural (Gang of Four) / Architectural (Event-Driven) |
-| **Pattern Names** | Observer (GoF) + Publish-Subscribe (Architectural) |
-| **Problem Solved** | How to push time-sensitive opportunity alerts to users in real-time without polling, without coupling the ingestion worker to individual WebSocket connections, and without blocking the data pipeline |
-| **Component Where Applied** | Notification Service — Redis Pub/Sub broker + FastAPI WebSocket endpoint |
-| **NFR Addressed** | NFR-4 Availability (decoupled delivery); NFR-1 Performance (push model, ~50ms delivery vs polling's N-second delay) |
+| Attribute                   | Details                                                                                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Pattern Family**          | Behavioural (Gang of Four) / Architectural (Event-Driven)                                                                                                                                              |
+| **Pattern Names**           | Observer (GoF) + Publish-Subscribe (Architectural)                                                                                                                                                     |
+| **Problem Solved**          | How to push time-sensitive opportunity alerts to users in real-time without polling, without coupling the ingestion worker to individual WebSocket connections, and without blocking the data pipeline |
+| **Component Where Applied** | Notification Service — Redis Pub/Sub broker + FastAPI WebSocket endpoint                                                                                                                               |
+| **NFR Addressed**           | NFR-4 Availability (decoupled delivery); NFR-1 Performance (push model, ~50ms delivery vs polling's N-second delay)                                                                                    |
 
 #### 2.7 How The Pattern Works In UniCompass
 
@@ -264,42 +280,77 @@ The classic **Observer** pattern defines a one-to-many dependency such that when
 #### 2.10 UML Sequence Diagram — WebSocket Connection Lifecycle
 ![Observer / Pub-Sub Pattern](pubsubseq.png)
 
+---
+
+#### 2.11 C4 Model Diagrams (Observer / Pub-Sub)
+
+> **C4 Level 1 — System Context:** Shows the student receiving real-time push alerts from UniCompass, and the external data sources that trigger new opportunity events.
+
+![C4 L1 System Context — Real-Time Notifications (Observer / Pub-Sub)](c4_pubsub_l1_context.png)
+
+> **C4 Level 2 — Container Diagram:** Maps the Publisher (Ingestion Worker), Broker (Redis Pub/Sub), Observer (WebSocket Server), and Frontend containers and the event flow between them.
+
+![C4 L2 Container — Real-Time Notification (Observer / Pub-Sub)](c4_pubsub_l2_container.png)
+
+> **C4 Level 3 — Component Diagram:** Zooms into the Notification Service, showing `IngestionWorker` (Subject), `Redis Pub/Sub Channel` (Broker), `WebSocket Handler` (Observer), and `NotificationManager` (Connection Registry).
+
+![C4 L3 Component — Notification Service (Observer / Pub-Sub)](c4_pubsub_l3_component.png)
+
+---
+
 ### Pattern 3 (Supporting) — Strategy Pattern (Feed Sorting)
 
 #### 2.11 Overview
 
 The **Strategy** pattern is used to make the feed sorting algorithm a first-class, swappable concern. Instead of a giant `if sort == "latest": ... elif sort == "relevant": ...` block in the route handler, each sorting algorithm is encapsulated in its own class implementing a common interface.
 
-| Strategy | Trigger | Algorithm |
-|----------|---------|-----------|
-| `LatestSortStrategy` | `sort=latest` (default) | `ORDER BY published_at DESC` in PostgreSQL |
+| Strategy                | Trigger                            | Algorithm                                                                |
+| ----------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| `LatestSortStrategy`    | `sort=latest` (default)            | `ORDER BY published_at DESC` in PostgreSQL                               |
 | `RelevanceSortStrategy` | `sort=relevant` (requires profile) | pgvector `<=>` cosine similarity operator against user profile embedding |
 
 #### 2.12 UML Class Diagram — Strategy Pattern
 
 ![Strategy Pattern](strategy.png)
+
+---
+
+#### 2.13 C4 Model Diagrams (Strategy Pattern)
+
+> **C4 Level 1 — System Context:** Shows the student requesting a personalised or chronological feed, and UniCompass's dependency on Gemini for building the profile embedding that powers relevance ranking.
+
+![C4 L1 System Context — Feed Sorting (Strategy Pattern)](c4_strategy_l1_context.png)
+
+> **C4 Level 2 — Container Diagram:** Shows the FastAPI Backend selecting a sort strategy at runtime, with Redis as the cache layer and PostgreSQL (with HNSW index) as the data store.
+
+![C4 L2 Container — Feed Delivery (Strategy Pattern)](c4_strategy_l2_container.png)
+
+> **C4 Level 3 — Component Diagram:** Zooms into the Feed Service, revealing `FeedRouter` (client), `FeedService` (context), `SortStrategy` (interface), `LatestSortStrategy` and `RelevanceSortStrategy` (concrete strategies), and `RedisCacheService` (cache decorator).
+
+![C4 L3 Component — Feed Service (Strategy Pattern)](c4_strategy_l3_component.png)
+
 ---
 
 ## Summary Table
 
 ### Architectural Tactics
 
-| # | Tactic | Category (Bass et al.) | NFR Addressed | Key Mechanism |
-|---|--------|----------------------|---------------|---------------|
-| 1 | **Cache-Aside (Redis)** | Performance | NFR-1 < 200 ms | Redis key-value store; TTL-based expiry; event-driven invalidation |
-| 2 | **Async Background Processing** | Scalability | NFR-2 Scalability | `asyncio.Task` workers decoupled from API thread; non-blocking I/O |
-| 3 | **Fault Isolation** | Availability | NFR-4 Availability | Per-adapter `try/except`; Redis fallback to DB; graceful degradation |
-| 4 | **URL-Based Deduplication** | Data Integrity | NFR-5 Deduplication | In-memory `set` + DB `UNIQUE` constraint + `ON CONFLICT DO NOTHING` |
-| 5 | **Semantic Vector Indexing** | Accuracy / Modifiability | NFR-3 Relevance | `all-MiniLM-L6-v2` embeddings + pgvector HNSW cosine similarity |
+| #   | Tactic                          | Category (Bass et al.)   | NFR Addressed       | Key Mechanism                                                        |
+| --- | ------------------------------- | ------------------------ | ------------------- | -------------------------------------------------------------------- |
+| 1   | **Cache-Aside (Redis)**         | Performance              | NFR-1 < 200 ms      | Redis key-value store; TTL-based expiry; event-driven invalidation   |
+| 2   | **Async Background Processing** | Scalability              | NFR-2 Scalability   | `asyncio.Task` workers decoupled from API thread; non-blocking I/O   |
+| 3   | **Fault Isolation**             | Availability             | NFR-4 Availability  | Per-adapter `try/except`; Redis fallback to DB; graceful degradation |
+| 4   | **URL-Based Deduplication**     | Data Integrity           | NFR-5 Deduplication | In-memory `set` + DB `UNIQUE` constraint + `ON CONFLICT DO NOTHING`  |
+| 5   | **Semantic Vector Indexing**    | Accuracy / Modifiability | NFR-3 Relevance     | `all-MiniLM-L6-v2` embeddings + pgvector HNSW cosine similarity      |
 
 ---
 
 ### Design Patterns
 
-| # | Pattern | GoF Category | Role In UniCompass | UML Diagram |
-|---|---------|-------------|-------------------|-------------|
-| 1 | **Facade + Adapter** | Structural | Unifies N heterogeneous external opportunity sources into one `fetch_all_opportunities()` call | Class + Sequence |
-| 2 | **Observer / Pub-Sub** | Behavioural | Decouples ingestion worker from WebSocket notification delivery via Redis broker | Class + 2× Sequence |
-| 3 | **Strategy** (supporting) | Behavioural | Encapsulates feed sorting algorithms (latest vs. relevant) as interchangeable policies | Class |
+| #   | Pattern                   | GoF Category | Role In UniCompass                                                                             | UML Diagram         |
+| --- | ------------------------- | ------------ | ---------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | **Facade + Adapter**      | Structural   | Unifies N heterogeneous external opportunity sources into one `fetch_all_opportunities()` call | Class + Sequence    |
+| 2   | **Observer / Pub-Sub**    | Behavioural  | Decouples ingestion worker from WebSocket notification delivery via Redis broker               | Class + 2× Sequence |
+| 3   | **Strategy** (supporting) | Behavioural  | Encapsulates feed sorting algorithms (latest vs. relevant) as interchangeable policies         | Class               |
 
 ---

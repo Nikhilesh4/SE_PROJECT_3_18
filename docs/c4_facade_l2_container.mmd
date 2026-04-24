@@ -1,0 +1,26 @@
+C4Container
+    title Level 2: Container Diagram — Ingestion Pipeline (Facade + Adapter)
+
+    Person(student, "Student", "Browses the discovery feed")
+
+    System_Boundary(unicompass, "UniCompass") {
+        Container(frontend, "Next.js Frontend", "React / Next.js", "Renders the discovery feed UI and handles user interactions")
+        Container(api, "FastAPI Backend", "Python / FastAPI / Uvicorn", "Exposes REST endpoints; validates JWT; orchestrates services")
+        Container(ingestion, "Ingestion Engine", "Python asyncio.Task", "Runs AggregatorFacade on a schedule. Calls all registered Adapters, merges results, deduplicates by source URL.")
+        ContainerDb(postgres, "PostgreSQL", "PostgreSQL 15 + pgvector", "Primary store: rss_items, users, bookmarks, profile embeddings")
+        ContainerDb(redis, "Redis", "Redis 7", "Feed response cache (TTL-based); Pub/Sub event broker")
+    }
+
+    System_Ext(adzuna, "Adzuna API", "Job listings REST API")
+    System_Ext(jooble, "Jooble API", "Job listings REST API")
+    System_Ext(rss_feeds, "RSS Feeds", "XML opportunity feeds")
+
+    Rel(student, frontend, "Uses", "HTTPS")
+    Rel(frontend, api, "Calls REST endpoints", "HTTP / JSON")
+    Rel(api, postgres, "Reads / Writes", "SQLAlchemy ORM")
+    Rel(api, redis, "Cache GET / SET", "async-redis")
+    Rel(ingestion, adzuna, "Fetch opportunities", "HTTP GET / JSON")
+    Rel(ingestion, jooble, "Fetch opportunities", "HTTP POST / JSON")
+    Rel(ingestion, rss_feeds, "Poll feeds", "HTTP GET / XML")
+    Rel(ingestion, postgres, "Upsert rss_items", "SQLAlchemy / ON CONFLICT DO NOTHING")
+    Rel(ingestion, redis, "Invalidate feed:* cache keys", "async-redis DEL")

@@ -1,0 +1,23 @@
+C4Component
+    title Level 3: Component Diagram — Feed Service (Strategy Pattern)
+
+    Container_Boundary(api, "FastAPI Backend") {
+        Component(feed_router, "FeedRouter", "FastAPI APIRouter — Client", "Handles GET /api/feed. Validates JWT, reads sort= query param, instantiates the correct SortStrategy, injects it into FeedService.")
+        Component(feed_svc, "FeedService", "Context — Strategy Holder", "Context object. Holds a reference to the active SortStrategy. Delegates sort() call to the strategy and wraps the full request in cache-aside logic.")
+        Component(cache_svc, "RedisCacheService", "Cache Decorator", "Checks Redis for feed:{category}:{sort}:{page} before executing strategy. On cache miss: executes strategy, stores result with TTL=300s.")
+        Component(sort_iface, "SortStrategy", "Python Abstract Base Class", "Common contract: sort(query, user_embedding) -> List[NormalizedRssItem]. FeedService is entirely strategy-agnostic.")
+        Component(latest_strat, "LatestSortStrategy", "Concrete Strategy", "Executes: SELECT * FROM rss_items ORDER BY published_at DESC LIMIT n. No user embedding required.")
+        Component(relevant_strat, "RelevanceSortStrategy", "Concrete Strategy", "Executes: SELECT * FROM rss_items ORDER BY embedding <=> :user_vec LIMIT n via pgvector. Requires non-null user profile embedding.")
+    }
+
+    ContainerDb(postgres, "PostgreSQL", "PostgreSQL + pgvector", "rss_items with HNSW index")
+    ContainerDb(redis, "Redis", "Redis 7", "Feed response cache")
+
+    Rel(feed_router, feed_svc, "Injects SortStrategy and calls execute()", "sort=latest or sort=relevant")
+    Rel(feed_svc, cache_svc, "Check / warm cache")
+    Rel(feed_svc, sort_iface, "Calls sort()")
+    Rel(sort_iface, latest_strat, "Implemented by")
+    Rel(sort_iface, relevant_strat, "Implemented by")
+    Rel(latest_strat, postgres, "ORDER BY published_at DESC", "SQLAlchemy")
+    Rel(relevant_strat, postgres, "embedding <=> user_embedding LIMIT n", "SQLAlchemy + pgvector")
+    Rel(cache_svc, redis, "GET / SET", "async-redis")
