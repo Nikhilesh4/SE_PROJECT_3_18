@@ -24,7 +24,8 @@ def test_upgrade_adopts_legacy_schema(database):
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             # What main.py used to produce: tables from create_all, plus the
             # unused opportunities table, minus the later-added deadline column.
-            Base.metadata.create_all(conn)
+            legacy = ("users", "profiles", "rss_items", "bookmarks")  # all the old app ever made
+            Base.metadata.create_all(conn, tables=[Base.metadata.tables[t] for t in legacy])
             conn.execute(text("ALTER TABLE rss_items DROP COLUMN application_deadline"))
             conn.execute(text("ALTER TABLE rss_items DROP COLUMN embedding"))
             conn.execute(text("CREATE TABLE opportunities (id SERIAL PRIMARY KEY, title VARCHAR)"))

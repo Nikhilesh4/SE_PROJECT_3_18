@@ -62,6 +62,12 @@ export default function Navbar() {
                                 Bookmarks
                             </Link>
                             <Link
+                                href="/assistant"
+                                className="text-slate-700 hover:text-slate-900 transition-colors text-sm font-medium"
+                            >
+                                Assistant
+                            </Link>
+                            <Link
                                 href="/profile"
                                 className="text-slate-700 hover:text-slate-900 transition-colors text-sm font-medium"
                             >

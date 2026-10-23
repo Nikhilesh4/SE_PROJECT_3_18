@@ -19,3 +19,5 @@ httpx
 python-dotenv
 bcrypt==4.0.1
 pytest
+anthropic  # Compass Agent with AGENT_PROVIDER=anthropic
+-e ../mcp-server  # agent tools: the UniCompass MCP server, run in-process (path relative to backend/)

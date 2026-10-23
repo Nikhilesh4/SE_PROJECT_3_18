@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
+    # Anthropic API (Compass Agent with AGENT_PROVIDER=anthropic). When empty,
+    # the SDK falls back to ANTHROPIC_AUTH_TOKEN or an `ant auth login` profile.
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+
+    # Compass Agent (in-app assistant)
+    AGENT_PROVIDER: str = os.getenv("AGENT_PROVIDER", "groq")  # "groq" | "anthropic"
+    AGENT_MODEL: str = os.getenv("AGENT_MODEL", "")  # empty → provider default
+    AGENT_MAX_TOOL_ROUNDS: int = 8
+    AGENT_MAX_MESSAGES_PER_CONVERSATION: int = 200
+
     # Resume parser provider preference
     PROFILE_AI_PROVIDER: str = os.getenv("PROFILE_AI_PROVIDER", "groq")
 

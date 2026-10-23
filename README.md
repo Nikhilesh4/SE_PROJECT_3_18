@@ -56,6 +56,7 @@ Redis is used as a read-through cache (Cache-Aside Pattern) with a 5-minute TTL,
 | 🔄 **Background Ingestion** | Two asyncio workers continuously refresh and invalidate RSS data |
 | 📊 **Cache Observability** | Every API response includes a `from_cache` flag for transparency |
 | 🗂️ **Category Filtering** | Filter by `internships`, `jobs`, `hackathons`, `research` |
+| 💬 **Compass Assistant** | In-app AI chat at `/assistant` that searches, explains and bookmarks opportunities and checks deadlines, using the same tools as the MCP server. Runs on Groq (default) or Claude |
 | 🤖 **MCP Server** | Use UniCompass from Claude Desktop / Claude Code / Cursor: semantic search, bookmarks, deadlines, profile edits, plus skill-gap and cover-letter prompts. See [`mcp-server/README.md`](mcp-server/README.md) |
 
 ---
@@ -208,6 +209,32 @@ The Next.js API routes act as a **Facade** — the browser never calls the FastA
 3. Hide internal backend URLs from the browser.
 
 ---
+
+### 4.6 Compass Assistant (Agent)
+
+`POST /agent/chat` runs a tool-use loop and streams Server-Sent Events: text deltas, tool calls,
+tool results and a final `done` event.
+
+```
+Browser ──SSE──► routers/agent.py ──► services/agent/loop.py ──► LLMProvider (Groq | Claude)
+                                            │
+                                            └─► Toolbox = UniCompass MCP server, in-process
+                                                  └─► FastAPI app via ASGI transport,
+                                                      authenticated with the chatting user's JWT
+```
+
+- **One tool definition, two consumers.** The agent's tools are the `mcp-server/` tools, so the
+  in-app assistant and Claude Desktop/Cursor behave identically. Tool calls go through the normal
+  API as the signed-in user, which means the agent can't do anything that user's own requests couldn't.
+- **Provider adapters.** Groq uses its OpenAI-compatible streaming API. Claude uses the Anthropic SDK
+  with adaptive thinking and server-side refusal fallbacks (`fallbacks="default"`).
+- **Append-only history** in `agent_conversations` / `agent_messages`, stored in each provider's own
+  message format. Claude needs its thinking blocks sent back unchanged, so a conversation stays on the
+  provider that started it. An assistant turn and its tool results are saved together, so an
+  interrupted request never leaves a tool call without a result.
+- **Guardrails.** At most 8 tool rounds per message; the model then gets one turn to answer with what it
+  has. Bad tool arguments, crashes and truncated or refused turns come back to the model as error
+  results. The system prompt treats posting text as untrusted data.
 
 ## 5. Project Structure
 
@@ -382,6 +409,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 
 # ── Google Generative AI (Gemini) ─────────────────────────
 GOOGLE_API_KEY=your-google-ai-api-key
+
+# ── Compass Assistant ────────────────────────────────────
+AGENT_PROVIDER=groq                 # or "anthropic"
+GROQ_API_KEY=your-groq-key          # used for groq (also used by resume parsing)
+ANTHROPIC_API_KEY=your-anthropic-key  # used for anthropic (default model claude-opus-5-5)
+# AGENT_MODEL=                      # optional model override for the chosen provider
 
 # ── Semantic matching (optional; defaults shown) ─────────
 EMBEDDINGS_ENABLED=true

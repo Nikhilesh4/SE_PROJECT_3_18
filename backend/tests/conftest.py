@@ -49,6 +49,11 @@ def _reset_schema() -> None:
         conn.execute(text("CREATE SCHEMA public"))
 
 
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
 @pytest.fixture(scope="session")
 def database():
     if not (make_url(TEST_DATABASE_URL).database or "").endswith("_test"):
