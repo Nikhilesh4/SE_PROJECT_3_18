@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Sequence
 
-from sqlalchemy import func, delete
+from sqlalchemy import delete, func, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -80,6 +80,15 @@ class RssItemRepository:
             q = q.filter(RssItem.category == category)
         q = q.order_by(RssItem.published_at.desc().nullslast(), RssItem.created_at.desc())
         return q.offset(offset).limit(limit).all()
+
+    def get_by_guid_or_url(self, key: str) -> RssItem | None:
+        """Single-row lookup used by the detail page (guid falls back to url on upsert)."""
+        return (
+            self._db.query(RssItem)
+            .filter(or_(RssItem.guid == key, RssItem.url == key))
+            .order_by((RssItem.guid == key).desc())  # prefer an exact guid match
+            .first()
+        )
 
     def count_items(self, *, category: str | None = None) -> int:
         q = self._db.query(func.count(RssItem.id))

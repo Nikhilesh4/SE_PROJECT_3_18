@@ -57,6 +57,12 @@ function ProfilePageInner() {
         invalidateProfileCache(data);
     };
 
+    const handleProfileChange = (data: ProfileData) => {
+        setProfile(data);
+        // Feed relevance ranking reads skills from this shared cache.
+        invalidateProfileCache(data);
+    };
+
     // ── Auth guard — show spinner while checking ──────────────────────────────
     if (checking || !isAuthenticated) {
         return (
@@ -177,7 +183,7 @@ function ProfilePageInner() {
                         Loading profile...
                     </div>
                 ) : profile ? (
-                    <ProfileDisplay profile={profile} />
+                    <ProfileDisplay profile={profile} onProfileChange={handleProfileChange} />
                 ) : (
                     !uploadDone && (
                         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">

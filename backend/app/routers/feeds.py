@@ -262,7 +262,7 @@ def rss_cache_status() -> dict:
     return cache_service.get_cache_status()
 
 
-@router.get("/rss/{item_id}", response_model=NormalizedRssItem)
+@router.get("/rss/{item_id:path}", response_model=NormalizedRssItem)
 def get_rss_item(item_id: str) -> NormalizedRssItem:
     """
     Fetch a single opportunity by GUID or URL.
@@ -273,11 +273,7 @@ def get_rss_item(item_id: str) -> NormalizedRssItem:
     if cached is not None:
         return NormalizedRssItem(**cached)
 
-    result = cache_service.get_cached_feed(limit=2000, offset=0, active_only=False)
-    item = next(
-        (i for i in result.items if (i.guid or i.url) == item_id),
-        None,
-    )
+    item = cache_service.get_item(item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Opportunity not found.")
 

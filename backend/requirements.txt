@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
+sqlalchemy>=2.0,<2.1  # 2.1 switched the default postgresql:// driver to psycopg v3
 psycopg2-binary
 alembic
 feedparser
@@ -18,3 +18,4 @@ pydantic-settings
 httpx
 python-dotenv
 bcrypt==4.0.1
+pytest

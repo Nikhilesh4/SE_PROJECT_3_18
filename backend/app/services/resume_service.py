@@ -4,7 +4,7 @@ from typing import Any, List
 from sqlalchemy.orm import Session
 
 from app.repositories.profile_repository import ProfileRepository
-from app.schemas.profile import EducationItem, ExperienceItem, ProfileOut
+from app.schemas.profile import EducationItem, ExperienceItem, ProfileOut, ProfileUpdate
 from app.services.adapters.ai_profile_adapter import AIProfileAdapter
 from app.services.adapters.pdf_extractor import PDFExtractor
 from app.services.events import publish_profile_updated
@@ -38,6 +38,21 @@ class ResumeProfileService:
         profile = self._repository.get_by_user_id(db, user_id)
         if profile is None:
             return None
+        return self._to_profile_out(profile)
+
+    def update_profile(
+        self, db: Session, user_id: int, update: ProfileUpdate
+    ) -> ProfileOut | None:
+        profile = self._repository.update_lists(
+            db=db,
+            user_id=user_id,
+            skills=update.skills,
+            interests=update.interests,
+        )
+        if profile is None:
+            return None
+
+        publish_profile_updated(user_id)
         return self._to_profile_out(profile)
 
     def _to_profile_out(self, profile: Any) -> ProfileOut:

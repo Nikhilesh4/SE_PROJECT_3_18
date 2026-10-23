@@ -4,56 +4,20 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from sqlalchemy import text
-
+from app.config import settings
+from app.migrations import run_migrations
 from app.routers import auth, bookmark, feeds, profile
-from app.db import engine, Base
 from app.workers.rss_refresh_worker import rss_refresh_loop
 from app.workers.ingestion_worker import ingestion_loop
 
-# Enable pgvector extension, then create all tables on startup
-with engine.connect() as conn:
-    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    conn.commit()
-Base.metadata.create_all(bind=engine)
-with engine.connect() as conn:
-    # Lightweight schema hardening for existing databases without migrations.
-    conn.execute(
-        text(
-            """
-            ALTER TABLE IF EXISTS rss_items
-            ADD COLUMN IF NOT EXISTS application_deadline TIMESTAMPTZ
-            """
-        )
-    )
-    conn.execute(
-        text(
-            """
-            CREATE INDEX IF NOT EXISTS ix_rss_items_application_deadline
-            ON rss_items (application_deadline)
-            """
-        )
-    )
-    # Recreate bookmarks table with correct FK to rss_items (was opportunities)
-    conn.execute(
-        text(
-            """
-            DO $$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'bookmarks' AND column_name = 'opportunity_id'
-                ) THEN
-                    DROP TABLE bookmarks;
-                END IF;
-            END $$;
-            """
-        )
-    )
-    conn.commit()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Schema is managed by Alembic (backend/alembic/versions). Migrating here
+    # keeps `uvicorn app.main:app` a one-command start for local development.
+    if settings.RUN_MIGRATIONS_ON_STARTUP:
+        await asyncio.to_thread(run_migrations)
+
     rss_task = asyncio.create_task(rss_refresh_loop(), name="rss-refresh-worker")
     ingestion_task = asyncio.create_task(ingestion_loop(), name="ingestion-worker")
     try:

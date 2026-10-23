@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
-from app.schemas.profile import ProfileOut
+from app.schemas.profile import ProfileOut, ProfileUpdate
 from app.services.errors import (
     AIResponseParseError,
     AIServiceTimeoutError,
@@ -129,4 +129,30 @@ def get_my_profile(
     redis_cache.set(cache_key, profile.model_dump(mode="json"), ttl_seconds=_PROFILE_TTL_SECONDS)
     profile.from_cache = False
 
+    return profile
+
+
+@router.patch("/me", response_model=ProfileOut)
+def update_my_profile(
+    update: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Edit the skills and/or interests extracted from the resume.
+
+    Caching Tactic:
+        Invalidation — profile:{user_id} is deleted so GET /profile/me
+        reflects the edit. Feed caches need no invalidation: their keys embed
+        a hash of the skills list, so new skills map to new keys.
+    """
+    profile = service.update_profile(db=db, user_id=current_user.id, update=update)
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No profile found. Upload a resume to get started.",
+        )
+
+    redis_cache.delete(_profile_cache_key(current_user.id))
+    profile.from_cache = False
     return profile

@@ -73,20 +73,12 @@ export default function OpportunityDetailPage() {
             }
         } catch { /* ignore */ }
 
-        // Fallback: fetch from API and search
+        // Fallback: direct lookup by GUID/URL (indexed on the backend)
         (async () => {
             try {
-                const res = await fetch(`/api/feeds?limit_per_feed=500`);
+                const res = await fetch(`/api/feeds/${encodeURIComponent(itemId)}`);
                 if (res.ok) {
-                    const data: RssAggregationResponse = await res.json();
-                    const found = data.items.find(
-                        (i) => (i.guid || i.url) === itemId
-                    );
-                    if (found) {
-                        setItem(found);
-                    } else {
-                        setNotFound(true);
-                    }
+                    setItem(await res.json());
                 } else {
                     setNotFound(true);
                 }

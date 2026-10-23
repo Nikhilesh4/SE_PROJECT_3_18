@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Jooble API
     JOOBLE_API_KEY: str = os.getenv("JOOBLE_API_KEY", "")
 
+    # Apply Alembic migrations when the API starts (disable when a deploy
+    # step runs `alembic upgrade head` instead)
+    RUN_MIGRATIONS_ON_STARTUP: bool = True
+
     # RSS Refresh
     RSS_REFRESH_ENABLED: bool = True
     RSS_DEFAULT_TTL_MINUTES: int = 60

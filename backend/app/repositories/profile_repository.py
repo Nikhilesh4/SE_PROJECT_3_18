@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -47,6 +47,27 @@ class ProfileRepository:
             profile.parsed_interests = parsed_profile.interests
             profile.parsed_education = education_json
             profile.parsed_experience = experience_json
+
+        db.commit()
+        db.refresh(profile)
+        return profile
+
+    def update_lists(
+        self,
+        db: Session,
+        user_id: int,
+        skills: Optional[List[str]] = None,
+        interests: Optional[List[str]] = None,
+    ) -> Optional[Profile]:
+        """Overwrite skills and/or interests; None means leave that field unchanged."""
+        profile = self.get_by_user_id(db, user_id)
+        if profile is None:
+            return None
+
+        if skills is not None:
+            profile.parsed_skills = skills
+        if interests is not None:
+            profile.parsed_interests = interests
 
         db.commit()
         db.refresh(profile)

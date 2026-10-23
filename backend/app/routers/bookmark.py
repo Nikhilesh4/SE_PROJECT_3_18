@@ -105,6 +105,7 @@ def list_bookmarks(
 
     return [
         NormalizedRssItem(
+            id=item.id,
             title=item.title,
             url=item.url,
             summary=item.summary or "",

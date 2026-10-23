@@ -316,6 +316,17 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 The API will be available at: **http://localhost:8000**  
 Interactive docs (Swagger UI): **http://localhost:8000/docs**
 
+**Database migrations (Alembic).** The schema lives in `backend/alembic/versions/`.
+The API applies pending migrations on startup (`RUN_MIGRATIONS_ON_STARTUP=true` by default),
+so the command above is enough for local development. Databases created before Alembic was
+introduced are adopted automatically by the baseline migration. Manual commands:
+
+```bash
+alembic upgrade head                          # apply migrations
+alembic revision -m "add xyz column"          # new migration (edit the generated file)
+alembic revision --autogenerate -m "..."      # or diff against the models
+```
+
 ---
 
 ### 7.4 Frontend Setup
@@ -466,7 +477,7 @@ GET /api/feeds/rss?category=internships&skills=python,machine+learning,fastapi&l
 |---|---|---|
 | `POST` | `/profile/upload-resume` | Upload a PDF resume; AI extracts skills |
 | `GET` | `/profile/me` | Get the current user's profile and extracted skills |
-| `PATCH` | `/profile/me` | Update profile fields manually |
+| `PATCH` | `/profile/me` | Edit `skills` and/or `interests` (omitted fields unchanged; trimmed and de-duplicated) |
 
 ---
 
@@ -542,11 +553,22 @@ def _relevance_score(item: NormalizedRssItem, skill_set: set[str]) -> int:
 
 ### Running Backend Tests
 
+The suite runs against a real PostgreSQL (the models use `ARRAY` and pgvector) and fakes Redis.
+Use a **disposable** database whose name ends in `_test`; its schema is dropped at the start of each run.
+
 ```bash
+# Throwaway pgvector container on port 5433 (separate from the dev database)
+docker run -d --rm --name unicompass-test-pg -p 5433:5432 \
+    -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=unicompass_test pgvector/pgvector:pg16
+
 cd backend
-venv\Scripts\activate    # Windows
-pytest tests/ -v
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pytest -v
+
+# Different host/port?  TEST_DATABASE_URL=postgresql://user:pass@host:port/name_test pytest
 ```
+
+If the test database is unreachable, DB-backed tests are skipped (pure unit tests still run).
 
 ### Running a Quick Smoke Test
 
