@@ -93,6 +93,9 @@ class RssItemRepository:
         q = q.order_by(RssItem.published_at.desc().nullslast(), RssItem.created_at.desc())
         return q.offset(offset).limit(limit).all()
 
+    def get_by_id(self, item_id: int) -> RssItem | None:
+        return self._db.get(RssItem, item_id)
+
     def get_by_guid_or_url(self, key: str) -> RssItem | None:
         """Single-row lookup used by the detail page (guid falls back to url on upsert)."""
         return (

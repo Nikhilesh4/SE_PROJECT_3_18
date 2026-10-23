@@ -1,0 +1,1 @@
+"""UniCompass MCP server."""

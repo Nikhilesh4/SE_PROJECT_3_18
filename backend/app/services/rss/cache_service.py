@@ -114,6 +114,14 @@ class RssCacheService:
         finally:
             db.close()
 
+    def get_item_by_id(self, item_id: int) -> NormalizedRssItem | None:
+        db = SessionLocal()
+        try:
+            row = RssItemRepository(db).get_by_id(item_id)
+            return self._row_to_schema(row) if row is not None else None
+        finally:
+            db.close()
+
     # ── Write to DB (called by the worker) ──────────────────────────
     def persist_items(self, items: list[NormalizedRssItem]) -> int:
         db = SessionLocal()

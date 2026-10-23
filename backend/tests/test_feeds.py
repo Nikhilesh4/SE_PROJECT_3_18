@@ -89,3 +89,11 @@ def test_get_item_includes_expired_items(client, seed_items):
 
 def test_get_unknown_item_is_404(client, db):
     assert client.get("/api/feeds/rss/does-not-exist").status_code == 404
+
+
+def test_get_item_by_numeric_id(client, seed_items):
+    (item,) = seed_items(make_item())
+    resp = client.get(f"/api/feeds/items/{item.id}")
+    assert resp.status_code == 200
+    assert resp.json()["url"] == item.url
+    assert client.get("/api/feeds/items/99999").status_code == 404

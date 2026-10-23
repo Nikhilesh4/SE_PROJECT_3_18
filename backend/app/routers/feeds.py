@@ -334,6 +334,18 @@ def rss_cache_status() -> dict:
     return cache_service.get_cache_status()
 
 
+@router.get("/items/{item_id}", response_model=NormalizedRssItem)
+def get_item_by_id(item_id: int) -> NormalizedRssItem:
+    """
+    Fetch a single opportunity by its numeric id (the same id bookmarks use).
+    Used by API clients such as the UniCompass MCP server.
+    """
+    item = cache_service.get_item_by_id(item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found.")
+    return item
+
+
 @router.get("/rss/{item_id:path}", response_model=NormalizedRssItem)
 def get_rss_item(item_id: str) -> NormalizedRssItem:
     """

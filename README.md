@@ -56,6 +56,7 @@ Redis is used as a read-through cache (Cache-Aside Pattern) with a 5-minute TTL,
 | 🔄 **Background Ingestion** | Two asyncio workers continuously refresh and invalidate RSS data |
 | 📊 **Cache Observability** | Every API response includes a `from_cache` flag for transparency |
 | 🗂️ **Category Filtering** | Filter by `internships`, `jobs`, `hackathons`, `research` |
+| 🤖 **MCP Server** | Use UniCompass from Claude Desktop / Claude Code / Cursor: semantic search, bookmarks, deadlines, profile edits, plus skill-gap and cover-letter prompts. See [`mcp-server/README.md`](mcp-server/README.md) |
 
 ---
 
@@ -244,6 +245,8 @@ SE_PROJECT_3_18/
 │   │   └── components/              # Reusable UI components
 │   ├── package.json
 │   └── next.config.ts
+│
+├── mcp-server/                      # MCP server for AI assistants (see mcp-server/README.md)
 │
 ├── docker-compose.yml               # PostgreSQL + Redis + RSS-Bridge
 ├── .gitignore
