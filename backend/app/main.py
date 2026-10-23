@@ -9,6 +9,7 @@ from app.migrations import run_migrations
 from app.routers import auth, bookmark, feeds, profile
 from app.workers.rss_refresh_worker import rss_refresh_loop
 from app.workers.ingestion_worker import ingestion_loop
+from app.workers.embedding_worker import embedding_loop
 
 
 @asynccontextmanager
@@ -20,12 +21,14 @@ async def lifespan(_: FastAPI):
 
     rss_task = asyncio.create_task(rss_refresh_loop(), name="rss-refresh-worker")
     ingestion_task = asyncio.create_task(ingestion_loop(), name="ingestion-worker")
+    embedding_task = asyncio.create_task(embedding_loop(), name="embedding-worker")
     try:
         yield
     finally:
-        rss_task.cancel()
-        ingestion_task.cancel()
-        for task in (rss_task, ingestion_task):
+        tasks = (rss_task, ingestion_task, embedding_task)
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
             try:
                 await task
             except asyncio.CancelledError:

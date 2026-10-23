@@ -1,32 +1,6 @@
 import pytest
 
-from app.db import SessionLocal
-from app.repositories.profile_repository import ProfileRepository
-from app.schemas.profile import ProfileStructured, ProfileUpdate
-
-
-@pytest.fixture
-def with_profile(client, auth_headers):
-    user_id = _user_id(auth_headers)
-    db = SessionLocal()
-    try:
-        ProfileRepository().upsert_profile(
-            db,
-            user_id,
-            raw_text="resume text",
-            parsed_profile=ProfileStructured(skills=["Python", "SQL"], interests=["ML"]),
-        )
-    finally:
-        db.close()
-    return auth_headers
-
-
-def _user_id(headers) -> int:
-    from jose import jwt
-    from app.config import settings
-
-    token = headers["Authorization"].split()[1]
-    return int(jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])["sub"])
+from app.schemas.profile import ProfileUpdate
 
 
 def test_get_profile_404_before_upload(client, auth_headers):

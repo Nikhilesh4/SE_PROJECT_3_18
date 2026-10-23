@@ -8,6 +8,7 @@ from app.schemas.profile import EducationItem, ExperienceItem, ProfileOut, Profi
 from app.services.adapters.ai_profile_adapter import AIProfileAdapter
 from app.services.adapters.pdf_extractor import PDFExtractor
 from app.services.events import publish_profile_updated
+from app.services.matching.semantic import refresh_profile_embedding
 
 
 class ResumeProfileService:
@@ -28,6 +29,7 @@ class ResumeProfileService:
             raw_text=raw_text,
             parsed_profile=structured,
         )
+        refresh_profile_embedding(db, profile)
 
         # Event publication is best-effort and should not fail user-facing flow.
         publish_profile_updated(user_id)
@@ -51,6 +53,7 @@ class ResumeProfileService:
         )
         if profile is None:
             return None
+        refresh_profile_embedding(db, profile)
 
         publish_profile_updated(user_id)
         return self._to_profile_out(profile)

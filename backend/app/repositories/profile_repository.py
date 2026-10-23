@@ -47,6 +47,7 @@ class ProfileRepository:
             profile.parsed_interests = parsed_profile.interests
             profile.parsed_education = education_json
             profile.parsed_experience = experience_json
+            profile.profile_embedding = None  # stale; recomputed by the service/worker
 
         db.commit()
         db.refresh(profile)
@@ -68,7 +69,23 @@ class ProfileRepository:
             profile.parsed_skills = skills
         if interests is not None:
             profile.parsed_interests = interests
+        profile.profile_embedding = None  # stale; recomputed by the service/worker
 
         db.commit()
         db.refresh(profile)
         return profile
+
+    def set_embedding(self, db: Session, profile_id: int, vector: List[float]) -> None:
+        db.query(Profile).filter(Profile.id == profile_id).update(
+            {Profile.profile_embedding: vector}, synchronize_session=False
+        )
+        db.commit()
+
+    def get_missing_embedding(self, db: Session, limit: int = 64) -> List[Profile]:
+        return (
+            db.query(Profile)
+            .filter(Profile.profile_embedding.is_(None))
+            .order_by(Profile.id)
+            .limit(limit)
+            .all()
+        )

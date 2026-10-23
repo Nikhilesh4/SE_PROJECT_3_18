@@ -2,6 +2,7 @@
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, ARRAY
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 
 from app.db import Base
 
@@ -21,6 +22,9 @@ class RssItem(Base):
     feed_url = Column(String, nullable=False)
     tags = Column(ARRAY(String), default=[])
     author = Column(String, nullable=True)
+    # all-MiniLM-L6-v2 embedding of title/tags/summary; filled asynchronously
+    # by the embedding worker and reset to NULL when that text changes.
+    embedding = Column(Vector(384), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

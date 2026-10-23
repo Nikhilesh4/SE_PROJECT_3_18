@@ -10,7 +10,7 @@ passlib[bcrypt]
 python-multipart
 pymupdf
 google-generativeai
-# sentence-transformers  # uncomment when needed for semantic matching (Task 8)
+fastembed  # local ONNX runtime for the sentence-transformers/all-MiniLM-L6-v2 embedding model
 pgvector
 websockets
 pydantic

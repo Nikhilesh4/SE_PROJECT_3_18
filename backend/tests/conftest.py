@@ -21,16 +21,24 @@ TEST_DATABASE_URL = os.environ.get(
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["RUN_MIGRATIONS_ON_STARTUP"] = "false"
 
+import math  # noqa: E402
+import re  # noqa: E402
+import zlib  # noqa: E402
 from datetime import datetime, timedelta, timezone  # noqa: E402
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
+from jose import jwt  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
 
-from app.db import engine  # noqa: E402
+from app.config import settings  # noqa: E402
+from app.db import SessionLocal, engine  # noqa: E402
 from app.migrations import run_migrations  # noqa: E402
+from app.repositories.profile_repository import ProfileRepository  # noqa: E402
+from app.schemas.profile import ProfileStructured  # noqa: E402
 from app.schemas.rss_item import NormalizedRssItem  # noqa: E402
+from app.services.matching import embeddings, semantic  # noqa: E402
 from app.services.redis_cache import redis_cache  # noqa: E402
 from app.services.rss.cache_service import cache_service  # noqa: E402
 
@@ -68,6 +76,51 @@ def fake_redis(monkeypatch):
     monkeypatch.setattr(redis_cache, "delete", lambda key: store.pop(key, None) is not None)
     monkeypatch.setattr("app.services.resume_service.publish_profile_updated", lambda user_id: True)
     return store
+
+
+class FakeEmbedder(embeddings.EmbeddingProvider):
+    """
+    Deterministic stand-in for the real model (no download, no ONNX).
+
+    Words in the same CONCEPTS group share one axis, so "machine learning"
+    and "neural networks" are similar without sharing a keyword — the
+    property semantic ranking is supposed to add. Other words are hashed
+    into the remaining axes, bag-of-words style.
+    """
+
+    CONCEPTS = [
+        {"machine learning", "neural", "deep learning", "pytorch", "ai"},
+        {"frontend", "react", "css", "javascript", "ui"},
+        {"finance", "accounting", "banking"},
+    ]
+
+    def embed(self, texts):
+        return [self._vector(t) for t in texts]
+
+    def _vector(self, text: str) -> list[float]:
+        text = text.lower()
+        vec = [0.0] * embeddings.EMBEDDING_DIM
+        for axis, words in enumerate(self.CONCEPTS):
+            vec[axis] += 3.0 * sum(1 for w in words if re.search(rf"\b{w}\b", text))
+        for word in re.findall(r"[a-z]+", text):
+            vec[len(self.CONCEPTS) + zlib.crc32(word.encode()) % 300] += 0.2
+        norm = math.sqrt(sum(v * v for v in vec)) or 1.0
+        return [v / norm for v in vec]
+
+
+@pytest.fixture(autouse=True)
+def fake_embedder(monkeypatch):
+    """Embeddings are 'ready' by default; set embeddings._embedder = None to test fallback."""
+    embedder = FakeEmbedder()
+    monkeypatch.setattr(embeddings, "_embedder", embedder)
+    monkeypatch.setattr(semantic, "_query_cache", {})
+    return embedder
+
+
+@pytest.fixture
+def no_embedder(monkeypatch):
+    monkeypatch.setattr(embeddings, "_embedder", None)
+    monkeypatch.setattr(embeddings, "_load_failed", True)  # get_embedder() won't try to load
 
 
 @pytest.fixture
@@ -123,3 +176,24 @@ def seed_items(db):
         return [cache_service.get_item(item.guid or item.url) for item in items]
 
     return _seed
+
+
+@pytest.fixture
+def with_profile(client, auth_headers):
+    user_id = _user_id(auth_headers)
+    db = SessionLocal()
+    try:
+        ProfileRepository().upsert_profile(
+            db,
+            user_id,
+            raw_text="resume text",
+            parsed_profile=ProfileStructured(skills=["Python", "SQL"], interests=["ML"]),
+        )
+    finally:
+        db.close()
+    return auth_headers
+
+
+def _user_id(headers) -> int:
+    token = headers["Authorization"].split()[1]
+    return int(jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])["sub"])

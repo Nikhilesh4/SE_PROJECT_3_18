@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Sequence
 
-from sqlalchemy import delete, func, or_
+from sqlalchemy import case, delete, func, null, or_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -60,6 +60,18 @@ class RssItemRepository:
                 "application_deadline": stmt.excluded.application_deadline,
                 "tags": stmt.excluded.tags,
                 "author": stmt.excluded.author,
+                # Re-embed only when the embedded text actually changed.
+                "embedding": case(
+                    (
+                        or_(
+                            RssItem.title.is_distinct_from(stmt.excluded.title),
+                            RssItem.summary.is_distinct_from(stmt.excluded.summary),
+                            RssItem.tags.is_distinct_from(stmt.excluded.tags),
+                        ),
+                        null(),
+                    ),
+                    else_=RssItem.embedding,
+                ),
                 "updated_at": func.now(),
             },
         )
@@ -104,6 +116,36 @@ class RssItemRepository:
             .all()
         )
         return [r[0] for r in rows]
+
+    # ── Embeddings ──────────────────────────────────────────────────
+    def get_items_missing_embedding(self, limit: int = 128) -> Sequence[RssItem]:
+        return (
+            self._db.query(RssItem)
+            .filter(RssItem.embedding.is_(None))
+            .order_by(RssItem.id)
+            .limit(limit)
+            .all()
+        )
+
+    def set_embeddings(self, vectors: dict[int, list[float]]) -> None:
+        for item_id, vector in vectors.items():
+            self._db.execute(
+                update(RssItem).where(RssItem.id == item_id).values(embedding=vector)
+            )
+        self._db.commit()
+
+    def cosine_similarities(
+        self, item_ids: list[int], query_vector: list[float]
+    ) -> dict[int, float]:
+        """pgvector cosine similarity (1 - distance) for items that have embeddings."""
+        if not item_ids:
+            return {}
+        rows = (
+            self._db.query(RssItem.id, RssItem.embedding.cosine_distance(query_vector))
+            .filter(RssItem.id.in_(item_ids), RssItem.embedding.isnot(None))
+            .all()
+        )
+        return {item_id: 1.0 - float(distance) for item_id, distance in rows}
 
     # ── Cleanup ─────────────────────────────────────────────────────
     def purge_old_items(self, days: int = 30) -> int:

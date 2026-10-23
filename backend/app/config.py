@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # step runs `alembic upgrade head` instead)
     RUN_MIGRATIONS_ON_STARTUP: bool = True
 
+    # Semantic matching (FR-4). all-MiniLM-L6-v2 produces 384-dim vectors,
+    # matching the vector(384) columns. Runs locally via fastembed (ONNX).
+    EMBEDDINGS_ENABLED: bool = True
+    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_CACHE_DIR: str = str(BASE_DIR / ".cache" / "fastembed")
+
     # RSS Refresh
     RSS_REFRESH_ENABLED: bool = True
     RSS_DEFAULT_TTL_MINUTES: int = 60

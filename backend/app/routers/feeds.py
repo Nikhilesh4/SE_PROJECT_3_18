@@ -3,12 +3,13 @@
 Architecture Patterns Used:
   - Cache-Aside Pattern: Redis sits in front of PostgreSQL.
   - Facade Pattern: Single entry point for all feed operations.
-  - Strategy Pattern: FeedFetchStrategy (ABC) with RelevanceFetchStrategy
-    and DefaultFetchStrategy concrete implementations, selected at runtime.
+  - Strategy Pattern: FeedFetchStrategy (ABC) with HybridRelevanceFetchStrategy,
+    RelevanceFetchStrategy and DefaultFetchStrategy, selected at runtime.
 
 Architecture Tactics:
   - Performance: Redis TTL of 5 minutes reduces DB reads.
-  - Availability: Redis failures fall back to DB silently.
+  - Availability: Redis failures fall back to DB silently; if the embedding
+    model is unavailable, ranking falls back to keyword-only relevance.
   - Modifiability: Skills-hash keeps personalised/generic caches independent.
 """
 
@@ -22,6 +23,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.rss_item import NormalizedRssItem, RssAggregationResponse
+from app.services.matching.semantic import item_similarities, query_vector
 from app.services.rss.cache_service import cache_service
 from app.services.redis_cache import redis_cache
 from app.workers.rss_refresh_worker import trigger_manual_refresh
@@ -71,6 +73,11 @@ def _relevance_score(item: NormalizedRssItem, skill_set: set[str]) -> int:
             score += 1
 
     return score
+
+
+def _recency_key(item: NormalizedRssItem) -> float:
+    """Tie-breaker: newer first; undated items last (never compare None/str to datetime)."""
+    return item.published_at.timestamp() if item.published_at else float("-inf")
 
 
 def _build_skills_hash(skills: List[str]) -> str:
@@ -125,10 +132,7 @@ class RelevanceFetchStrategy(FeedFetchStrategy):
             for item in all_result.items
         ]
 
-        scored.sort(
-            key=lambda t: (t[1], t[0].published_at or ""),
-            reverse=True,
-        )
+        scored.sort(key=lambda t: (t[1], _recency_key(t[0])), reverse=True)
 
         all_items_sorted = [item for item, _ in scored]
         total = len(all_items_sorted)
@@ -138,6 +142,63 @@ class RelevanceFetchStrategy(FeedFetchStrategy):
             items=page_items,
             sources=all_result.sources,
             total_items=total,
+            fetched_at=all_result.fetched_at,
+        )
+
+
+class HybridRelevanceFetchStrategy(FeedFetchStrategy):
+    """
+    Semantic + keyword relevance (FR-4).
+
+    Like RelevanceFetchStrategy it scores ALL active items before paginating,
+    but the score blends:
+      - cosine similarity between the item's embedding and the embedded
+        skills list (computed by pgvector) — catches related wording such as
+        "machine learning" ↔ "neural networks", and
+      - the keyword score from `_relevance_score`, capped and scaled to 0..1 —
+        keeps exact tag/title matches on top.
+    Items not yet embedded get a semantic score of 0 until the embedding
+    worker reaches them.
+    """
+
+    SEMANTIC_WEIGHT = 0.7
+    KEYWORD_WEIGHT = 0.3
+    KEYWORD_CAP = 10
+
+    def __init__(self, query_vector: list[float]) -> None:
+        self._query_vector = query_vector
+
+    def execute(
+        self,
+        *,
+        category: Optional[str],
+        active_only: bool,
+        resolved_limit: int,
+        offset: int,
+        skill_set: set[str],
+    ) -> "RssAggregationResponse":
+        all_result = cache_service.get_cached_feed(
+            category=category,
+            limit=2000,
+            offset=0,
+            active_only=active_only,
+        )
+        similarities = item_similarities(
+            [i.id for i in all_result.items if i.id is not None], self._query_vector
+        )
+
+        def score(item: NormalizedRssItem) -> float:
+            keyword = min(_relevance_score(item, skill_set), self.KEYWORD_CAP) / self.KEYWORD_CAP
+            semantic = similarities.get(item.id, 0.0)
+            return self.SEMANTIC_WEIGHT * semantic + self.KEYWORD_WEIGHT * keyword
+
+        ranked = sorted(
+            all_result.items, key=lambda i: (score(i), _recency_key(i)), reverse=True
+        )
+        return RssAggregationResponse(
+            items=ranked[offset: offset + resolved_limit],
+            sources=all_result.sources,
+            total_items=len(ranked),
             fetched_at=all_result.fetched_at,
         )
 
@@ -197,7 +258,9 @@ def list_rss_opportunities(
         sorted by score DESC, then paginated in Python.
         This guarantees the globally most-relevant items are returned regardless
         of which DB page they reside on.
-        Cache key: feed:{category}:{active}:{limit}:{offset}:{skills_hash}
+        Scoring is hybrid (semantic + keyword) when the embedding model is
+        ready, keyword-only otherwise.
+        Cache key: feed:{category}:{active}:{limit}:{offset}:{skills_hash}[-semantic]
         — separate key so personalised and generic caches never collide.
     """
     resolved_limit = limit_per_feed if limit_per_feed is not None else limit
@@ -209,7 +272,12 @@ def list_rss_opportunities(
         skill_list = [s.strip() for s in skills.split(",") if s.strip()]
         skill_set = {_normalise_token(s) for s in skill_list}
 
+    # Semantic vector for the skills (None → model not ready / disabled).
+    vector = query_vector(skill_list) if skill_list else None
+
     skills_hash = _build_skills_hash(skill_list) if skill_list else "none"
+    if vector is not None:
+        skills_hash += "-semantic"  # keyword-only fallback results never share a key
 
     # ── Cache-Aside: check Redis first ───────────────────────────────────────
     cache_key = (
@@ -223,9 +291,13 @@ def list_rss_opportunities(
         return response
 
     # ── Cache MISS: select and execute the appropriate strategy ─────────────
-    strategy: FeedFetchStrategy = (
-        RelevanceFetchStrategy() if skill_set else DefaultFetchStrategy()
-    )
+    strategy: FeedFetchStrategy
+    if vector is not None:
+        strategy = HybridRelevanceFetchStrategy(vector)
+    elif skill_set:
+        strategy = RelevanceFetchStrategy()
+    else:
+        strategy = DefaultFetchStrategy()
 
     result = strategy.execute(
         category=category,

@@ -51,7 +51,7 @@ Redis is used as a read-through cache (Cache-Aside Pattern) with a 5-minute TTL,
 |---|---|
 | 🔐 **Authentication** | JWT-based login/register with bcrypt password hashing |
 | 📄 **Resume Parsing** | Upload a PDF resume; Google Generative AI extracts skills automatically |
-| 🔍 **Skill-Ranked Discovery** | Feed items are globally scored and ranked against your extracted skills |
+| 🔍 **Semantic Skill Matching** | Feed items are ranked by meaning, not just keywords: pgvector cosine similarity on `all-MiniLM-L6-v2` embeddings, blended with keyword matches ("machine learning" finds a "neural networks" posting) |
 | ⚡ **Redis Caching** | Cache-Aside with per-user skill-hash keys; cold-start < 200 ms, warm < 5 ms |
 | 🔄 **Background Ingestion** | Two asyncio workers continuously refresh and invalidate RSS data |
 | 📊 **Cache Observability** | Every API response includes a `from_cache` flag for transparency |
@@ -150,10 +150,10 @@ Request ──► Redis HIT? ──YES──► Return (from_cache=True)
 
 Cache key format:
 ```
-feed:{category}:{active_only}:{limit}:{offset}:{skills_hash}
+feed:{category}:{active_only}:{limit}:{offset}:{skills_hash}[-semantic]
 ```
 
-Personalised responses (with skills) use a different `skills_hash` than generic responses, so they **never collide** in cache.
+Personalised responses (with skills) use a different `skills_hash` than generic responses, so they **never collide** in cache. The `-semantic` suffix keeps hybrid-ranked results apart from keyword-only fallback results.
 
 ---
 
@@ -164,20 +164,35 @@ The feed endpoint uses the **Strategy Pattern** to select the fetching algorithm
 ```
 FeedFetchStrategy (ABC)
         │
-        ├── RelevanceFetchStrategy   ← used when skills are provided
-        │     Fetches ALL items → scores → sorts globally → paginates
+        ├── HybridRelevanceFetchStrategy ← skills provided + embedding model ready
+        │     ALL items → 0.7 × cosine similarity (pgvector) + 0.3 × keyword score
+        │     → sorts globally → paginates
+        │
+        ├── RelevanceFetchStrategy   ← skills provided, model unavailable (fallback)
+        │     Fetches ALL items → keyword scores → sorts globally → paginates
         │
         └── DefaultFetchStrategy     ← used when no skills provided
               Standard paginated DB fetch, no scoring
 ```
 
-**Strategy selection (one line):**
+**Strategy selection:**
 ```python
-strategy: FeedFetchStrategy = (
-    RelevanceFetchStrategy() if skill_set else DefaultFetchStrategy()
-)
+vector = query_vector(skill_list)          # None if the model isn't ready
+if vector is not None:
+    strategy = HybridRelevanceFetchStrategy(vector)
+elif skill_set:
+    strategy = RelevanceFetchStrategy()
+else:
+    strategy = DefaultFetchStrategy()
 result = strategy.execute(...)
 ```
+
+**How embeddings are produced.** A third background worker (`workers/embedding_worker.py`)
+loads the model once (the first start downloads about 90 MB into `backend/.cache/fastembed`), then every
+minute embeds every `rss_items` row and profile whose vector is `NULL`. That covers new items
+from all ingestion paths, backfills existing rows, and catches items whose title, summary or tags
+changed, because the upsert resets their vector. Requests never wait for the model: until it is
+ready, ranking falls back to keywords.
 
 Adding a new ranking strategy (e.g., `DateSortStrategy`) requires **zero changes** to the endpoint — just a new class.
 
@@ -364,6 +379,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 
 # ── Google Generative AI (Gemini) ─────────────────────────
 GOOGLE_API_KEY=your-google-ai-api-key
+
+# ── Semantic matching (optional; defaults shown) ─────────
+EMBEDDINGS_ENABLED=true
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2   # must output 384-dim vectors
 ```
 
 > **⚠️ Warning**: Never commit `.env.local` to version control. It is already listed in `.gitignore`.
