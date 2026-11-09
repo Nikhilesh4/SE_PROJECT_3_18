@@ -27,6 +27,8 @@ services:
         value: "true"
       - key: AGENT_PROVIDER
         value: groq
+      - key: EMBEDDINGS_ENABLED   # the embedding model needs more than the 512 MB Starter plan has (OOM crash loop).
+        value: "false"            # Set to "true" only after moving the API to a 2 GB+ plan.
       # ── Set these in the Render dashboard (never commit them) ──
       - {key: GROQ_API_KEY, sync: false}
       - {key: ADMIN_EMAILS, sync: false}      # comma-separated emails that get admin access
