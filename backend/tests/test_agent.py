@@ -146,7 +146,8 @@ def test_search_then_answer_streams_and_persists(client, auth_headers, seed_item
     assert result["preview"][0]["title"] == "Machine Learning Intern"  # real ranking, real DB
     text = "".join(e["delta"] for e in events if e["type"] == "text")
     assert text.strip() == "Top pick: Machine Learning Intern"
-    assert "bookmark_opportunity" in provider.tool_names  # MCP tools exposed
+    assert "search_opportunities" in provider.tool_names  # MCP tools exposed
+    assert "draft_outreach" not in provider.tool_names  # only tools the message plausibly needs are offered
 
     conv = client.get(f"/agent/conversations/{events[0]['id']}", headers=auth_headers).json()
     assert [m["role"] for m in conv["messages"]] == ["user", "assistant"]

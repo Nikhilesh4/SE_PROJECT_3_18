@@ -22,6 +22,7 @@ from datetime import date
 from typing import Any, Awaitable, Callable
 
 from app.services.agent.providers import LLMProvider, ProviderError, ToolOutcome
+from app.services.agent.tool_select import select_tools
 from app.services.agent.tools import Toolbox
 
 logger = logging.getLogger("agent.loop")
@@ -82,6 +83,7 @@ async def run_agent(
     pending: list[dict[str, Any]] = [provider.user_message(user_text)]
     rounds = 0
     limit_hit = False
+    used: set[str] = set()  # tools the model has called this run stay on offer
 
     async def on_text(delta: str) -> None:
         await emit({"type": "text", "delta": delta})
@@ -89,7 +91,8 @@ async def run_agent(
     while True:
         try:
             turn = await provider.stream_turn(
-                system=system, history=history + pending, tools=toolbox.specs, on_text=on_text
+                system=system, history=history + pending,
+                tools=select_tools(toolbox.specs, user_text, used), on_text=on_text
             )
         except ProviderError as exc:
             # Nothing of this turn is persisted; earlier units already are.
@@ -120,6 +123,7 @@ async def run_agent(
 
         outcomes: list[ToolOutcome] = []
         for call in turn.tool_calls:
+            used.add(call.name)
             await emit({"type": "tool_call", "id": call.id, "name": call.name, "arguments": call.arguments})
             if blocked_reason:
                 outcome = ToolOutcome(call, blocked_reason, is_error=True)
