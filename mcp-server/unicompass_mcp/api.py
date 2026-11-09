@@ -149,6 +149,33 @@ class UniCompassAPI:
     async def remove_bookmark(self, item_id: int) -> dict:
         return await self._request("DELETE", f"/api/bookmarks/{item_id}")
 
+    # ── RAG (posting-text retrieval) ─────────────────────────────────
+
+    async def search_passages(
+        self, query: str, *, category: str | None = None, limit: int = 8, active_only: bool = True
+    ) -> dict:
+        params: dict[str, Any] = {"q": query, "limit": limit, "active_only": str(active_only).lower()}
+        if category:
+            params["category"] = category
+        return await self._request("GET", "/api/rag/search", auth=False, params=params)
+
+    async def item_passages(self, item_id: int, question: str | None = None, *, limit: int = 4) -> dict:
+        params: dict[str, Any] = {"limit": limit}
+        if question:
+            params["q"] = question
+        return await self._request("GET", f"/api/rag/items/{item_id}/passages", auth=False, params=params)
+
+    async def compare(self, item_ids: list[int], aspects: list[str] | None = None) -> dict:
+        params: dict[str, Any] = {"ids": ",".join(str(i) for i in item_ids)}
+        if aspects:
+            params["aspects"] = ",".join(aspects)
+        return await self._request("GET", "/api/rag/compare", auth=False, params=params)
+
+    async def resume_match(self, item_id: int, *, limit: int = 6) -> dict:
+        return await self._request(
+            "GET", f"/api/rag/items/{item_id}/resume-match", params={"limit": limit}
+        )
+
 
 def _detail(resp: httpx.Response) -> str:
     try:

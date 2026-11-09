@@ -28,6 +28,7 @@
     - 10.1 [Authentication](#101-authentication)
     - 10.2 [Feeds](#102-feeds)
     - 10.3 [Profile](#103-profile)
+    - 10.4 [RAG (posting text)](#104-rag-posting-text)
 11. [Design Patterns Reference](#11-design-patterns-reference)
 12. [Code Documentation Guide](#12-code-documentation-guide)
 13. [Testing](#13-testing)
@@ -56,6 +57,7 @@ Redis is used as a read-through cache (Cache-Aside Pattern) with a 5-minute TTL,
 | 🔄 **Background Ingestion** | Two asyncio workers continuously refresh and invalidate RSS data |
 | 📊 **Cache Observability** | Every API response includes a `from_cache` flag for transparency |
 | 🗂️ **Category Filtering** | Filter by `internships`, `jobs`, `hackathons`, `research` |
+| 📚 **Posting Q&A (RAG)** | Ask a posting "is it paid?" or "who can apply?" and get an answer that cites the passages it comes from, or says the posting doesn't state it. Also cross-posting fact search, side-by-side comparison, and resume-to-posting matching (via the assistant and MCP) |
 | 💬 **Compass Assistant** | In-app AI chat at `/assistant` that searches, explains and bookmarks opportunities and checks deadlines, using the same tools as the MCP server. Runs on Groq (default) or Claude |
 | 🤖 **MCP Server** | Use UniCompass from Claude Desktop / Claude Code / Cursor: semantic search, bookmarks, deadlines, profile edits, plus skill-gap and cover-letter prompts. See [`mcp-server/README.md`](mcp-server/README.md) |
 
@@ -235,6 +237,27 @@ Browser ──SSE──► routers/agent.py ──► services/agent/loop.py ─
 - **Guardrails.** At most 8 tool rounds per message; the model then gets one turn to answer with what it
   has. Bad tool arguments, crashes and truncated or refused turns come back to the model as error
   results. The system prompt treats posting text as untrusted data.
+
+### 4.7 RAG over posting text
+
+Postings are split into passages of about 450 characters (sentence-packed, one sentence of overlap,
+plus a `Tags:` passage) and stored in `rag_chunks` with an embedding and a generated `tsvector`.
+The embedding worker builds them: when it (re-)embeds a posting it rebuilds that posting's
+passages, so they follow text changes, and it backfills postings indexed before the table existed.
+
+```
+question ──► full-text (websearch_to_tsquery, GIN) ─┐
+         └─► embedding ──► pgvector cosine (HNSW) ──┴─► Reciprocal Rank Fusion ──► cited passages
+```
+
+- **Across all postings** a full-text hit must contain every term; within one posting any term counts.
+  Meaning-only hits below cosine 0.35 are dropped, so "nothing relevant" stays empty.
+- **Without the embedding model**, retrieval falls back to full-text search alone.
+- **Who writes the answer.** Retrieval returns passages; the assistant's or MCP client's own model
+  writes the answer. Only the posting page's Ask box (`POST /api/rag/items/{id}/ask`) makes its own
+  call to the configured agent provider, with a cite-or-say-"Not stated in this posting" prompt.
+- Indexing uses only the stored summaries (capped at 2,000 characters by ingestion), so answers
+  can only be as complete as the feed text.
 
 ## 5. Project Structure
 
@@ -533,6 +556,18 @@ GET /api/feeds/rss?category=internships&skills=python,machine+learning,fastapi&l
 | `POST` | `/profile/upload-resume` | Upload a PDF resume; AI extracts skills |
 | `GET` | `/profile/me` | Get the current user's profile and extracted skills |
 | `PATCH` | `/profile/me` | Edit `skills` and/or `interests` (omitted fields unchanged; trimmed and de-duplicated) |
+
+---
+
+### 10.4 RAG (posting text)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/rag/search?q=&category=&active_only=&limit=` | Passages across all postings that state `q` |
+| `GET` | `/api/rag/items/{id}/passages?q=&limit=` | Passages of one posting, most relevant to `q` first |
+| `GET` | `/api/rag/compare?ids=1,2,3&aspects=pay,location` | Per-aspect passages for 2–5 postings |
+| `GET` | `/api/rag/items/{id}/resume-match` | Resume lines most relevant to the posting (auth) |
+| `POST` | `/api/rag/items/{id}/ask` | `{"question"}` → grounded answer with `citations` and `passages` (auth; one LLM call) |
 
 ---
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { useBookmarks } from "@/lib/useBookmarks";
 import { NormalizedRssItem, RssAggregationResponse } from "@/lib/useFeed";
+import AskPosting from "./AskPosting";
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string; icon: string }> = {
     internship: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200", icon: "🎓" },
@@ -259,6 +260,9 @@ export default function OpportunityDetailPage() {
                             </div>
                         </div>
                     )}
+
+                    {/* Posting Q&A (RAG) */}
+                    {item.id != null && <AskPosting itemId={item.id} />}
 
                     {/* Action buttons */}
                     <div className="p-6 sm:p-8 border-t border-slate-200 bg-slate-50">

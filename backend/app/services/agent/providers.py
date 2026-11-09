@@ -122,10 +122,16 @@ class AnthropicProvider(LLMProvider):
                 max_tokens=16000,
                 system=system,
                 messages=history,
-                tools=[
-                    {"name": t.name, "description": t.description, "input_schema": t.input_schema}
-                    for t in tools
-                ],
+                **(
+                    {
+                        "tools": [
+                            {"name": t.name, "description": t.description, "input_schema": t.input_schema}
+                            for t in tools
+                        ]
+                    }
+                    if tools
+                    else {}
+                ),
                 thinking={"type": "adaptive"},
                 output_config={"effort": "medium"},
                 betas=[self.FALLBACK_BETA],
@@ -220,18 +226,19 @@ class GroqProvider(LLMProvider):
         body = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, *history],
-            "tools": [
+            "temperature": 0.3,
+            "max_tokens": 4096,
+            "stream": True,
+        }
+        if tools:  # the API rejects tool_choice without tools (plain completions, e.g. RAG answers)
+            body["tools"] = [
                 {
                     "type": "function",
                     "function": {"name": t.name, "description": t.description, "parameters": t.input_schema},
                 }
                 for t in tools
-            ],
-            "tool_choice": "auto",
-            "temperature": 0.3,
-            "max_tokens": 4096,
-            "stream": True,
-        }
+            ]
+            body["tool_choice"] = "auto"
         text_parts: list[str] = []
         calls: dict[int, dict[str, str]] = {}
         finish = None

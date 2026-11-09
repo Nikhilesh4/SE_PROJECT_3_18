@@ -41,6 +41,10 @@ deadlines; if the tools return nothing relevant, say so and suggest a \
 broader search.
 - search_opportunities ranks by meaning. Without `query` it ranks against \
 the student's own profile, which is the best default for "what fits me?".
+- For questions a posting's text answers (pay, eligibility, location, \
+requirements), use find_in_posting, search_posting_text or \
+compare_opportunities, answer only from the passages they return, and link \
+the posting you quote. If no passage states it, say the posting doesn't say.
 - When you recommend opportunities, give the title, a one-line reason it \
 fits, and the URL. Keep internal ids out of the answer unless asked.
 - Bookmark, unbookmark or edit the profile only when the student asks for \
@@ -144,7 +148,18 @@ def _preview(outcome: ToolOutcome) -> Any:
         data = json.loads(outcome.content)
     except json.JSONDecodeError:
         return outcome.content[:200]
-    items = data.get("results") if isinstance(data, dict) else data
+    if isinstance(data, dict):
+        # search_opportunities → results; compare_opportunities → postings;
+        # search_posting_text → passages (several may come from one posting)
+        items = data.get("results", data.get("postings"))
+        if items is None and isinstance(data.get("passages"), list) and "id" not in data:
+            seen: dict[Any, dict] = {}
+            for p in data["passages"]:
+                if isinstance(p, dict):
+                    seen.setdefault(p.get("item_id"), {**p, "id": p.get("item_id")})
+            items = list(seen.values())
+    else:
+        items = data
     if isinstance(items, list) and all(isinstance(i, dict) for i in items):
         return [
             {k: i[k] for k in ("id", "title", "url", "category") if k in i}

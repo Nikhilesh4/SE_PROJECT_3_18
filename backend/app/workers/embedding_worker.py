@@ -4,7 +4,8 @@ Embedding Worker — keeps opportunity and profile vectors up to date.
 Runs as an asyncio task registered in the FastAPI lifespan.  It:
 1. Loads the embedding model once in a thread (first run downloads ~90 MB).
 2. Every cycle, embeds rows whose vector is NULL — new items from any
-   ingestion worker, items whose text changed, and profiles.
+   ingestion worker, items whose text changed, and profiles — and splits
+   those postings into RAG passages (plus a backfill for older rows).
 3. Invalidates feed caches when vectors changed, since rankings shift.
 
 Embedding is CPU-bound, so all model work runs in a thread to keep the
@@ -19,6 +20,7 @@ import logging
 from app.config import settings
 from app.services.matching.embeddings import get_embedder
 from app.services.matching.semantic import embed_pending_items, embed_pending_profiles
+from app.services.rag.indexer import index_pending_items
 from app.services.redis_cache import redis_cache
 
 logger = logging.getLogger("workers.embedding")
@@ -28,8 +30,11 @@ EMBED_INTERVAL_SECONDS = 60
 
 
 def _run_embedding_cycle() -> dict:
-    items = embed_pending_items()
+    items = embed_pending_items()  # also (re)builds those postings' RAG passages
     profiles = embed_pending_profiles()
+    backfilled = index_pending_items()
+    if backfilled:
+        logger.info("Indexed RAG passages for %d postings", backfilled)
     if items:
         invalidated = redis_cache.delete_pattern("feed:*")
         logger.info(
@@ -40,7 +45,7 @@ def _run_embedding_cycle() -> dict:
         )
     elif profiles:
         logger.info("Embedded %d profiles", profiles)
-    return {"items": items, "profiles": profiles}
+    return {"items": items, "profiles": profiles, "rag_backfilled": backfilled}
 
 
 async def embedding_loop() -> None:

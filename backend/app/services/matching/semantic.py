@@ -25,6 +25,7 @@ from app.services.matching.embeddings import (
     profile_text,
     query_text,
 )
+from app.services.rag.indexer import index_rows
 
 logger = logging.getLogger("matching.semantic")
 
@@ -52,6 +53,8 @@ def embed_pending_items(batch_size: int = 64, max_items: int = 2000) -> int:
                 [item_text(r.title, r.tags or [], r.summary or "") for r in rows]
             )
             repo.set_embeddings({r.id: v for r, v in zip(rows, vectors)})
+            # New or changed text: rebuild the posting's RAG passages too.
+            index_rows(db, rows, embedder)
             done += len(rows)
     finally:
         db.close()

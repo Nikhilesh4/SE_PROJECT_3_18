@@ -40,6 +40,7 @@ class FakeBackend:
         self.valid_tokens = {"tok-1"}
         self.logins = 0
         self.feed_calls: list[dict] = []
+        self.rag_calls: list[dict] = []
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path, method = request.url.path, request.method
@@ -62,6 +63,34 @@ class FakeBackend:
                 items = [i for i in items if i["application_deadline"] > NOW.isoformat()]
             return httpx.Response(200, json={"items": items, "sources": [], "total_items": len(items),
                                              "fetched_at": NOW.isoformat(), "from_cache": False})
+        if path == "/api/rag/search":
+            params = dict(request.url.params)
+            self.rag_calls.append(params)
+            hits = [i for i in self.items.values() if params["q"].lower() in i["summary"].lower()]
+            return httpx.Response(200, json={"query": params["q"], "passages": [
+                {"item_id": i["id"], "chunk_index": 0, "text": i["summary"], "title": i["title"],
+                 "url": i["url"], "category": i["category"], "source": i["source_name"],
+                 "application_deadline": i["application_deadline"], "match": "keyword",
+                 "similarity": None} for i in hits]})
+        if path.startswith("/api/rag/items/") and path.endswith("/passages"):
+            item = self.items.get(int(path.split("/")[4]))
+            if item is None:
+                return httpx.Response(404, json={"detail": "Opportunity not found."})
+            self.rag_calls.append(dict(request.url.params))
+            return httpx.Response(200, json={"item_id": item["id"], "passages": [
+                {"item_id": item["id"], "chunk_index": 0, "text": item["summary"], "title": item["title"],
+                 "url": item["url"], "category": item["category"], "source": item["source_name"],
+                 "application_deadline": item["application_deadline"], "match": "both",
+                 "similarity": 0.61}]})
+        if path == "/api/rag/compare":
+            params = dict(request.url.params)
+            ids = [int(i) for i in params["ids"].split(",")]
+            aspects = params.get("aspects", "pay,location").split(",")
+            return httpx.Response(200, json={"aspects": aspects, "postings": [
+                {"id": i, "title": self.items[i]["title"], "published_at": NOW.isoformat(),
+                 "aspects": {a: ({"text": f"{a} of {i}", "chunk_index": 0, "match": "keyword"}
+                                 if i == 1 else None) for a in aspects}}
+                for i in ids]})
         if path.startswith("/api/feeds/items/"):
             item = self.items.get(int(path.rsplit("/", 1)[1]))
             return httpx.Response(200, json=item) if item else httpx.Response(404, json={"detail": "Opportunity not found."})
@@ -78,6 +107,14 @@ class FakeBackend:
         if path == "/profile/me" and method == "PATCH":
             self.profile.update(json.loads(request.content))
             return httpx.Response(200, json=self.profile)
+        if path.startswith("/api/rag/items/") and path.endswith("/resume-match"):
+            if self.profile is None:
+                return httpx.Response(404, json={"detail": "No profile found. Upload a resume first."})
+            return httpx.Response(200, json={
+                "item_id": int(path.split("/")[4]), "ranked_by": "semantic", "matched_skills": ["PyTorch"],
+                "posting_tags_not_in_profile": ["ml"],
+                "evidence": [{"text": "Trained a PyTorch vision model.", "similarity": 0.7,
+                              "best_posting_passage": "Train vision models."}]})
         if path == "/api/bookmarks/ids":
             return httpx.Response(200, json={"ids": self.bookmarks})
         if path == "/api/bookmarks":
@@ -163,6 +200,46 @@ async def test_unknown_opportunity_is_readable_error(backend):
     async with make_client(backend) as client:
         out = await call(client, "get_opportunity", id=999)
     assert out["error"].endswith("Not found: Opportunity not found.")
+
+
+# ── Posting text (RAG) ───────────────────────────────────────────────────────
+
+async def test_search_posting_text_returns_citable_passages(backend):
+    async with make_client(backend) as client:
+        result = await call(client, "search_posting_text", query="UI work")
+    (passage,) = result["passages"]
+    assert passage == {"item_id": 2, "title": "React Developer", "url": "https://ex.com/2",
+                       "category": "job", "application_deadline": backend.items[2]["application_deadline"],
+                       "text": "UI work.", "match": "keyword"}
+    assert backend.rag_calls[0]["active_only"] == "true"
+
+
+async def test_find_in_posting_passes_question_and_reports_missing(backend):
+    async with make_client(backend) as client:
+        result = await call(client, "find_in_posting", id=1, question="is it paid?")
+        missing = await call(client, "find_in_posting", id=99)
+    assert result["title"] == "ML Research Intern"
+    assert result["passages"] == [{"chunk_index": 0, "text": backend.items[1]["summary"], "match": "both"}]
+    assert backend.rag_calls[0]["q"] == "is it paid?"
+    assert "Not found" in missing["error"]
+
+
+async def test_compare_flattens_aspects_to_text_or_null(backend):
+    async with make_client(backend) as client:
+        result = await call(client, "compare_opportunities", ids=[1, 2], aspects=["pay"])
+        too_few = await call(client, "compare_opportunities", ids=[1])
+    assert result["postings"][0]["aspects"] == {"pay": "pay of 1"}
+    assert result["postings"][1]["aspects"] == {"pay": None}
+    assert "published_at" not in result["postings"][0]
+    assert "error" in too_few
+
+
+async def test_resume_match_and_cover_letter_use_resume_lines(backend):
+    async with make_client(backend) as client:
+        match = await call(client, "match_resume_to_opportunity", id=1)
+        prompt = await client.get_prompt("cover_letter", {"id": "1"})
+    assert match["evidence"] == [{"text": "Trained a PyTorch vision model.", "similarity": 0.7}]
+    assert "- Trained a PyTorch vision model." in prompt.messages[0].content.text
 
 
 # ── Bookmarks & deadlines ────────────────────────────────────────────────────

@@ -57,6 +57,10 @@ export const TOOL_LABELS: Record<string, string> = {
     remove_bookmark: "Removing a bookmark",
     get_profile: "Reading your profile",
     update_profile: "Updating your profile",
+    search_posting_text: "Searching posting text",
+    find_in_posting: "Reading the posting",
+    compare_opportunities: "Comparing postings",
+    match_resume_to_opportunity: "Matching your resume",
 };
 
 export class ChatHttpError extends Error {

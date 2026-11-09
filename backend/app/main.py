@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.migrations import run_migrations
-from app.routers import agent, auth, bookmark, feeds, profile
+from app.routers import agent, auth, bookmark, feeds, profile, rag
 from app.workers.rss_refresh_worker import rss_refresh_loop
 from app.workers.ingestion_worker import ingestion_loop
 from app.workers.embedding_worker import embedding_loop
@@ -66,6 +66,7 @@ app.include_router(bookmark.router, prefix="/api")
 app.include_router(feeds.router, prefix="/api")
 app.include_router(profile.router)
 app.include_router(agent.router)
+app.include_router(rag.router, prefix="/api")
 
 
 @app.get("/")

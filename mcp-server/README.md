@@ -18,6 +18,10 @@ HTTP API as the signed-in user.
 | Tool | `search_opportunities(query?, category?, limit, offset, include_expired)` | Semantic search. Ranks against `query` if given, otherwise against the student's skills and interests |
 | Tool | `get_opportunity(id)` | Full posting text, plus whether it's bookmarked |
 | Tool | `upcoming_deadlines(days)` | Bookmarked items due within `days`, soonest first |
+| Tool | `search_posting_text(query, category?, limit, include_expired)` | Passages from any posting that state a fact ("visa sponsorship"), for quoting. Hybrid full-text + semantic search |
+| Tool | `find_in_posting(id, question?)` | One posting's passages, most relevant to the question first, for a cited answer |
+| Tool | `compare_opportunities(ids, aspects?)` | 2–5 postings side by side: per aspect (pay, location, skills, eligibility, …) the passage that addresses it, or null |
+| Tool | `match_resume_to_opportunity(id)` | The resume lines most relevant to a posting, matched skills, and posting tags the student lacks |
 | Tool | `list_bookmarks(category?)` | Saved opportunities |
 | Tool | `bookmark_opportunity(id)` | Save. Idempotent: a repeat call never un-saves |
 | Tool | `remove_bookmark(id)` | Unsave (marked destructive, so clients ask first) |
@@ -25,7 +29,7 @@ HTTP API as the signed-in user.
 | Tool | `update_profile(add_skills?, remove_skills?, add_interests?, remove_interests?)` | Edit lists. Removal ignores case. Changes re-rank the feed immediately |
 | Resource | `unicompass://profile`, `unicompass://bookmarks` | The same data as JSON, for attaching as context |
 | Prompt | `skill_gap(id)` | Requirement-by-requirement comparison with the profile, plus a plan to close gaps |
-| Prompt | `cover_letter(id, tone?)` | Tailored draft using only facts from the profile |
+| Prompt | `cover_letter(id, tone?)` | Tailored draft using only facts from the profile, led by the most relevant resume lines |
 | Prompt | `weekly_plan()` | Deadlines plus new matches turned into a day-by-day plan |
 
 Every opportunity carries an integer `id`, the same id the bookmark endpoints use.
