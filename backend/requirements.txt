@@ -8,6 +8,7 @@ redis
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
+slowapi  # rate limiting for login, register and resume upload
 pymupdf
 google-genai
 fastembed  # local ONNX runtime for the sentence-transformers/all-MiniLM-L6-v2 embedding model

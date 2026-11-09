@@ -3,9 +3,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.migrations import run_migrations
+from app.rate_limit import limiter, rate_limit_exceeded_handler
 from app.routers import agent, auth, bookmark, feeds, profile, rag
 from app.workers.rss_refresh_worker import rss_refresh_loop
 from app.workers.ingestion_worker import ingestion_loop
@@ -41,6 +43,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # CORS — allow the Next.js frontend (and any localhost port for dev)
 app.add_middleware(

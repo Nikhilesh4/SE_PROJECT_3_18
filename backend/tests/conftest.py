@@ -20,6 +20,10 @@ TEST_DATABASE_URL = os.environ.get(
 # Must be set before any app module is imported (settings read env at import).
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["RUN_MIGRATIONS_ON_STARTUP"] = "false"
+# A fixed key keeps tests from creating backend/.secret_key; limits are off
+# except in tests/test_security.py, which switches them on explicitly.
+os.environ["SECRET_KEY"] = "test-secret-key-only-for-the-pytest-suite-0123456789"
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 
 import math  # noqa: E402
 import re  # noqa: E402

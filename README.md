@@ -426,7 +426,10 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/unicompass
 REDIS_URL=redis://localhost:6379
 
 # ── JWT Auth ──────────────────────────────────────────────
-SECRET_KEY=your-super-secret-key-change-this-in-production
+# At least 32 characters; placeholder values are rejected at startup. If unset, a random
+# key is generated into backend/.secret_key (gitignored) on first run.
+# Generate one: python -c "import secrets; print(secrets.token_urlsafe(48))"
+SECRET_KEY=
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 
@@ -438,6 +441,13 @@ AGENT_PROVIDER=groq                 # or "anthropic"
 GROQ_API_KEY=your-groq-key          # used for groq (also used by resume parsing)
 ANTHROPIC_API_KEY=your-anthropic-key  # used for anthropic (default model claude-opus-5-5)
 # AGENT_MODEL=                      # optional model override for the chosen provider
+
+# ── Rate limiting (optional; defaults shown) ─────────────
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_STORAGE_URI=memory://    # use your REDIS_URL when running several API processes
+LOGIN_RATE_LIMIT=10/minute          # per client IP
+REGISTER_RATE_LIMIT=10/hour         # per client IP
+UPLOAD_RATE_LIMIT=10/hour           # per user (resume upload calls an LLM)
 
 # ── Semantic matching (optional; defaults shown) ─────────
 EMBEDDINGS_ENABLED=true

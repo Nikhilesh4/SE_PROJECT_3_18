@@ -1,4 +1,6 @@
+import logging
 import os
+import secrets
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
@@ -9,6 +11,59 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load local overrides first, then fallback defaults.
 load_dotenv(BASE_DIR / ".env.local")
 load_dotenv(BASE_DIR / ".env")
+
+logger = logging.getLogger("config")
+
+MIN_SECRET_KEY_LENGTH = 32
+_PLACEHOLDER_SECRETS = {"change-me", "changeme", "secret", "your-secret-key"}
+_SECRET_KEY_FILE = BASE_DIR / ".secret_key"
+
+
+def _is_placeholder(value: str) -> bool:
+    lowered = value.strip().lower()
+    return lowered in _PLACEHOLDER_SECRETS or "change-me" in lowered or "change-this" in lowered
+
+
+def resolve_secret_key(value: str | None, key_file: Path = _SECRET_KEY_FILE) -> str:
+    """Return the JWT signing key, refusing placeholder or weak values.
+
+    An explicit SECRET_KEY must be at least 32 characters and not a known
+    placeholder, otherwise startup fails. When none is set (typical local dev),
+    a random key is generated once and kept in a gitignored file next to the
+    backend so tokens survive restarts. That removes the old behaviour of
+    silently signing every token with a publicly known default.
+    """
+    hint = 'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+    if value:
+        if _is_placeholder(value):
+            raise RuntimeError(f"SECRET_KEY is a placeholder value. {hint}")
+        if len(value) < MIN_SECRET_KEY_LENGTH:
+            raise RuntimeError(
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters. {hint}"
+            )
+        return value
+
+    try:
+        existing = key_file.read_text().strip()
+        if len(existing) >= MIN_SECRET_KEY_LENGTH:
+            return existing
+    except OSError:
+        pass
+
+    generated = secrets.token_urlsafe(48)
+    try:
+        key_file.touch(mode=0o600, exist_ok=True)
+        key_file.write_text(generated)
+        logger.warning("SECRET_KEY not set; generated a local key in %s", key_file.name)
+    except OSError:
+        logger.warning(
+            "SECRET_KEY not set and %s is not writable; using a temporary key "
+            "(logins will not survive a restart)",
+            key_file.name,
+        )
+    return generated
+
+
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv(
@@ -19,7 +74,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     # JWT
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me-in-production")
+    SECRET_KEY: str = resolve_secret_key(os.getenv("SECRET_KEY"))
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
@@ -59,6 +114,14 @@ class Settings(BaseSettings):
     EMBEDDINGS_ENABLED: bool = True
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     EMBEDDING_CACHE_DIR: str = str(BASE_DIR / ".cache" / "fastembed")
+
+    # Rate limiting (per client IP; uploads are per user). Use the Redis URL as
+    # the storage when running more than one API process so counts are shared.
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_STORAGE_URI: str = "memory://"
+    LOGIN_RATE_LIMIT: str = "10/minute"
+    REGISTER_RATE_LIMIT: str = "10/hour"
+    UPLOAD_RATE_LIMIT: str = "10/hour"
 
     # RSS Refresh
     RSS_REFRESH_ENABLED: bool = True

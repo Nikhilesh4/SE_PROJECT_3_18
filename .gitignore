@@ -93,3 +93,4 @@ logs/
 /package-lock.json
 /.postqode/
 /dell_resume.pdf
+/backend/.secret_key

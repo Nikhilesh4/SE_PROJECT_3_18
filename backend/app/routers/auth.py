@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
@@ -6,6 +6,7 @@ from app.db import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
 from app.middleware.auth import create_access_token
+from app.rate_limit import limiter, login_limit, register_limit
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -23,7 +24,8 @@ class RegisterResponse(UserResponse):
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit(register_limit)
+def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Register a new user and return a JWT so the client can auto-login.
 
@@ -78,7 +80,8 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(user_data: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit(login_limit)
+def login(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
     """
     Authenticate a user and return a JWT token.
     Verifies email and password, then generates an access token.

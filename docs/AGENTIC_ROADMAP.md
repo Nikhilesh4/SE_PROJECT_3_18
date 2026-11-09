@@ -184,7 +184,7 @@ Migrations run automatically when the API starts (`RUN_MIGRATIONS_ON_STARTUP=tru
 |---|---|---|
 | G2 | **Real-time notifications (FR-5)** | `/ws/notifications` WebSocket plus a Redis subscriber. After ingestion, compare new posting embeddings with profile embeddings (both exist now) and publish `new_match` above a threshold. Add a bell/toast in `Navbar.tsx`. Merged into phase 7 |
 | G8 | **Workers inside the API process** | The RSS workers make blocking calls on the event loop: `/health` responds slowly at startup and the server ignored SIGTERM during testing. Move workers to their own container (`arq` or Celery) in `docker-compose.yml` |
-| G9 | **Security basics** | Fail at startup if `SECRET_KEY` is the default; consider httpOnly cookies instead of a JWT in localStorage; rate-limit login and upload (`slowapi`) |
+| G9 | **Security basics** ✅ (partly) | Done: `SECRET_KEY` placeholders and keys under 32 chars fail at startup, and an unset key is generated into `backend/.secret_key`; `slowapi` limits login, register (per IP) and resume upload (per user). Left: move the JWT from localStorage to an httpOnly cookie (needs the frontend to go through the Next.js proxy routes) |
 
 ### 5.2 Product features (not agentic) ⬜
 
@@ -299,7 +299,7 @@ The Compass Agent becomes an MCP host. It loads external servers from
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/unicompass
 REDIS_URL=redis://localhost:6379/0
-SECRET_KEY=change-me
+SECRET_KEY=<32+ chars>          # or leave unset in dev: a key is generated into backend/.secret_key
 
 # Resume parsing + Compass Assistant + Ask-this-posting
 GROQ_API_KEY=...

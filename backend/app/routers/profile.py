@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
+from app.rate_limit import limiter, upload_limit
 from app.schemas.profile import ProfileOut, ProfileUpdate
 from app.services.errors import (
     AIResponseParseError,
@@ -29,7 +30,9 @@ def _profile_cache_key(user_id: int) -> str:
 
 
 @router.post("/upload-resume", response_model=ProfileOut, status_code=status.HTTP_200_OK)
+@limiter.limit(upload_limit)
 async def upload_resume(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
