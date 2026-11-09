@@ -30,7 +30,7 @@ from app.models.rss_item import RssItem
 from app.repositories.rss_repository import RssItemRepository
 from app.schemas.rss_item import NormalizedRssItem
 from app.services.adapters.base_adapter import OpportunityAdapter
-from app.services.discovery import fetcher
+from app.services.discovery import fetcher, qa_rules
 from app.services.discovery.textutil import html_to_text
 from app.services.insights import signals
 from app.services.rss.filter import is_opportunity_post
@@ -199,32 +199,28 @@ def func_length(col):
 # ── Ingestion QA ─────────────────────────────────────────────────────────────
 
 def ingestion_qa(db: Session, *, limit: int = 500) -> dict:
-    """Flag stored postings that the regex content filter lets through but are really blog posts/news.
+    """Flag stored postings that are really blog posts, news, recaps, podcasts or error pages.
 
-    Flagged rows get `not-opportunity` and drop out of the feed (they are not deleted, so a
-    mistaken flag can be reversed). Postings from structured sources (ATS/Devpost/programs) are trusted.
+    Flagged rows get `not-opportunity` plus a `qa:<reason>` flag and drop out of every user-facing
+    query (they are not deleted, so a mistaken flag can be found and reversed). Rows are stamped with
+    the rules version, so improving the rules re-checks them. Postings from structured sources
+    (ATS/Devpost/programs) are trusted.
     """
-    from sqlalchemy import func
     rows = (
         db.query(RssItem)
-        .filter(RssItem.discovered_by == "rss", ~RssItem.flags.any("not-opportunity"), ~RssItem.flags.any("qa-checked"))
+        .filter(RssItem.discovered_by.in_(["rss", "web_search"]), ~RssItem.flags.any("not-opportunity"), ~RssItem.flags.any(qa_rules.QA_FLAG))
         .order_by(RssItem.id.desc()).limit(limit).all()
     )
-    flagged = 0
+    flagged: dict[str, int] = {}
     for row in rows:
-        row.flags = [*(row.flags or []), "qa-checked"]
-        if not is_opportunity_post(row.title, row.summary or "", row.category) or _looks_like_article(row):
-            row.flags = [*row.flags, "not-opportunity"]
-            flagged += 1
+        # Only the explainable rules run here. Re-running the ingestion content filter on stored rows
+        # was tried and hid real jobs, because stored summaries are truncated or enriched.
+        verdict = qa_rules.classify(row.title, row.summary or "", row.category)
+        row.flags = [*(f for f in (row.flags or []) if f != "qa-checked"), qa_rules.QA_FLAG, *verdict.flags]
+        if verdict.reject:
+            flagged[verdict.reason] = flagged.get(verdict.reason, 0) + 1
     db.commit()
-    return {"checked": len(rows), "flagged": flagged}
-
-
-_ARTICLE_TITLE = re.compile(r"^(how to|why |what is|what are|top \d+|\d+ (ways|tips|reasons)|the (best|ultimate) guide|guide to|opinion:|report:|announces?|raises \$)", re.I)
-
-
-def _looks_like_article(row: RssItem) -> bool:
-    return bool(_ARTICLE_TITLE.search(row.title.strip()))
+    return {"checked": len(rows), "flagged": sum(flagged.values()), "reasons": flagged}
 
 
 # ── Orchestration ────────────────────────────────────────────────────────────

@@ -36,3 +36,12 @@ class RssItem(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    @classmethod
+    def visible(cls):
+        """SQL clause for postings that QA has not flagged as non-opportunities.
+
+        Use it on every discovery surface (feed, search, RAG, missions, alerts). Lookups of one
+        specific posting, and a user's own saved items, are deliberately not filtered.
+        """
+        return ~cls.flags.any("not-opportunity")

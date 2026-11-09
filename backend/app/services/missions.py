@@ -72,7 +72,7 @@ def run_mission(db: Session, mission: Mission, *, limit: int = 10, notify: bool 
     now = datetime.now(timezone.utc)
     q = db.query(RssItem).filter(
         RssItem.id.notin_(seen), RssItem.id.notin_(dismissed),
-        ~RssItem.flags.any("scam-risk"),
+        ~RssItem.flags.any("scam-risk"), RssItem.visible(),
         (RssItem.application_deadline.is_(None)) | (RssItem.application_deadline >= now),
     )
     if mission.category:

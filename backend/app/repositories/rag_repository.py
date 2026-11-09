@@ -97,8 +97,12 @@ class RagRepository:
     def _filtered(stmt, filters: ChunkFilter):
         if filters.item_ids is not None:
             stmt = stmt.where(RagChunk.rss_item_id.in_(filters.item_ids))
-        if filters.category or filters.active_only:
+        # Searches across postings never surface QA-flagged ones; a search scoped to given ids may.
+        cross_posting = filters.item_ids is None
+        if filters.category or filters.active_only or cross_posting:
             stmt = stmt.join(RssItem, RssItem.id == RagChunk.rss_item_id)
+        if cross_posting:
+            stmt = stmt.where(RssItem.visible())
         if filters.category:
             stmt = stmt.where(RssItem.category == filters.category)
         if filters.active_only:

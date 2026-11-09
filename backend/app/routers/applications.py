@@ -96,6 +96,8 @@ def deadlines(
         RssItem.application_deadline >= now,
         RssItem.application_deadline <= now + timedelta(days=days),
     )
+    if scope != "saved":
+        q = q.filter(RssItem.visible())  # a user's own saved items stay visible
     if scope == "saved":
         q = q.join(Bookmark, Bookmark.rss_item_id == RssItem.id).filter(
             Bookmark.user_id == user.id, Bookmark.status == "saved"

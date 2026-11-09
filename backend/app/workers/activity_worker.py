@@ -1,6 +1,6 @@
 """Activity worker: turns fresh data into things a user sees.
 
-Every few minutes: new-match and deadline notifications. Once a day: due
+Every few minutes: ingestion QA, then new-match and deadline notifications. Once a day: due
 missions and the weekly digest. All jobs are idempotent (notifications are
 deduplicated per user), so running two workers or restarting is harmless.
 """
@@ -12,6 +12,7 @@ import logging
 
 from app.db import SessionLocal
 from app.services.digest import send_due_digests
+from app.services.discovery.pipeline import ingestion_qa
 from app.services.missions import run_due_missions
 from app.services.notify import notify_deadlines, notify_new_matches
 
@@ -23,7 +24,9 @@ ACTIVITY_INTERVAL_SECONDS = 10 * 60
 def run_activity_cycle() -> dict:
     db = SessionLocal()
     try:
+        # QA first, so a blog post or error page is hidden before it can trigger an alert.
         result = {
+            "qa_flagged": ingestion_qa(db)["flagged"],
             "matches": notify_new_matches(db),
             "deadlines": notify_deadlines(db),
             "mission_matches": run_due_missions(db),

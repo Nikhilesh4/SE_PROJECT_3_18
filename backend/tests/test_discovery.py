@@ -337,3 +337,50 @@ def test_ingestion_qa_flags_articles_and_hides_them(client, seed_items):
         session.close()
     ids = [i["id"] for i in client.get("/api/feeds/rss").json()["items"]]
     assert real.id in ids and article.id not in ids
+
+
+def test_qa_records_reasons_and_rechecks_when_rules_version_changes(client, seed_items):
+    podcast, real = seed_items(
+        make_item(url="https://e.com/p", title="The Real Python Podcast – Episode #300: Testing", summary="Listen now.", category="course"),
+        make_item(url="https://e.com/c", title="Building REST APIs with Flask", summary="Enroll in this course.", category="course"),
+    )
+    session = SessionLocal()
+    try:
+        res = pipeline.ingestion_qa(session)
+        assert res["reasons"].get("media-not-posting") == 1
+        assert {"not-opportunity", "qa:media-not-posting"} <= set(session.get(RssItem, podcast.id).flags)
+        assert "qa:media-not-posting" not in session.get(RssItem, real.id).flags
+
+        # A row stamped with an older rules version is checked again.
+        row = session.get(RssItem, real.id)
+        row.flags = ["qa-v1"]
+        session.commit()
+        assert pipeline.ingestion_qa(session)["checked"] == 1
+        assert pipeline.ingestion_qa(session)["checked"] == 0
+    finally:
+        session.close()
+
+
+def test_flagged_postings_are_hidden_from_search_but_not_from_direct_lookup(client, seed_items, auth_headers):
+    junk, real = seed_items(
+        make_item(url="https://e.com/j", title="How I built a hackathon app with Django", summary="Hackathon write-up, register link inside.", category="hackathon"),
+        make_item(url="https://e.com/g", title="Hackathon Django Challenge", summary="Register by Dec 1. Prizes.", category="hackathon"),
+    )
+    session = SessionLocal()
+    try:
+        pipeline.ingestion_qa(session)
+    finally:
+        session.close()
+    ids = [i["id"] for i in client.get("/api/search", params={"q": "hackathon django"}, headers=auth_headers).json()["items"]]
+    assert real.id in ids and junk.id not in ids
+    assert client.get(f"/api/feeds/items/{junk.id}").status_code == 200  # still reachable by id; the flag is reversible
+
+
+def test_qa_does_not_hide_real_postings_just_because_the_summary_is_thin(client, seed_items):
+    (job,) = seed_items(make_item(url="https://e.com/bj", title="Backend Java Developer", summary="", category="job"))
+    session = SessionLocal()
+    try:
+        assert pipeline.ingestion_qa(session)["flagged"] == 0
+        assert "not-opportunity" not in session.get(RssItem, job.id).flags
+    finally:
+        session.close()

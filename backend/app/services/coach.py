@@ -171,6 +171,7 @@ def company_brief(db: Session, name: str, *, profile: Profile | None) -> dict:
     like = f"%{name.strip()}%"
     rows = (
         db.query(RssItem)
+        .filter(RssItem.visible())
         .filter((RssItem.author.ilike(like)) | (RssItem.source_name.ilike(like)) | (RssItem.title.ilike(like)))
         .order_by(RssItem.published_at.desc().nullslast()).limit(100).all()
     )
@@ -198,7 +199,7 @@ def reverse_search(db: Session, profile: Profile, *, limit: int = 10) -> list[di
     dist = RssItem.embedding.cosine_distance(list(profile.profile_embedding))
     rows = (
         db.query(RssItem.author, func.count(RssItem.id), func.min(dist))
-        .filter(RssItem.embedding.isnot(None), RssItem.author.isnot(None))
+        .filter(RssItem.visible(), RssItem.embedding.isnot(None), RssItem.author.isnot(None))
         .group_by(RssItem.author).order_by(func.min(dist)).limit(limit).all()
     )
     return [{"company": a, "postings": n, "best_match": round(1 - float(d), 3)} for a, n, d in rows]

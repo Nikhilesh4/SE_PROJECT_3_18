@@ -66,7 +66,7 @@ def search(
     db: Session = Depends(get_db),
 ) -> dict:
     now = datetime.now(timezone.utc)
-    query = db.query(RssItem)
+    query = db.query(RssItem).filter(RssItem.visible())
     if category:
         query = query.filter(RssItem.category == category)
     if source:
@@ -140,7 +140,7 @@ def trends(
     db: Session = Depends(get_db),
 ) -> dict:
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    rows = db.query(RssItem).filter(func.coalesce(RssItem.published_at, RssItem.created_at) >= since).limit(5000).all()
+    rows = db.query(RssItem).filter(RssItem.visible(), func.coalesce(RssItem.published_at, RssItem.created_at) >= since).limit(5000).all()
     skill_counts: Counter[str] = Counter()
     by_category: Counter[str] = Counter()
     stipends: dict[str, list[float]] = {}

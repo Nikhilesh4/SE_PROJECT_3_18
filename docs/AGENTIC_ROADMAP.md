@@ -368,7 +368,6 @@ cd ../mcp-server && .venv/bin/pytest
 
 **Not built**
 - Reddit/Discord/Telegram watchers, funding-news "hidden market" scout, GitHub "good first issue" discovery.
-- Ingestion QA exists in the discovery pipeline (checked 500, flagged 6 in the live run), but the `hackathon` category in the dev DB still holds blog posts and RSS-Bridge error items, so its coverage is limited.
 - Langfuse/external tracing (an `agent_runs` table exists), weekly career-standup agent, aggregate stipend insights.
 - Peer features (sharing, hackathon teams, campus feeds), autofill extension, GraphRAG, Researcher-Tailor-Writer-Reviewer pipeline.
 
@@ -388,3 +387,9 @@ Run against the dev DB (2,174 postings, 8,227 RAG passages) with a real Groq key
 Bugs found and fixed: the default Groq model had been retired (404 on every call); `gpt-oss` cites as 【n】 and the citation parser missed it; no retry on 429; Groq's 8k tokens/minute limit counts `max_tokens` and about 3.5k tokens of tool definitions per round (now bounded: smaller `max_tokens`, `reasoning_effort=low`, 5,000-char tool results, up to 6 retries honoring `retry-after`); the assistant said "found nothing" when only the deadline was missing (prompt fixed).
 
 Still unverified: Anthropic provider, web search (no Tavily/Brave key), external MCP servers, the Gmail inbox agent. Free-tier Groq makes an agent turn slow (about 2 minutes for 5 tool rounds); a paid tier or Claude removes that.
+
+### Ingestion QA v2 (2026-11-09)
+
+`services/discovery/qa_rules.py` is a category-aware, versioned rule set (error pages, podcasts and newsletters, listicles, news, first-person dev logs, tutorials, recaps and winner announcements). Each rejection stores `not-opportunity` plus a `qa:<reason>` flag, so a wrong call can be found and reversed. Bumping `QA_VERSION` re-checks stored rows. QA runs first in every activity-worker cycle, so junk is hidden before it can trigger an alert. `RssItem.visible()` is applied to the feed, search, cross-posting RAG, missions, alerts, trends, company brief and public deadlines; direct lookups by id and a user's own saved items are not filtered.
+
+On the dev DB it hides 33 of 2,375 postings (podcasts, listicles, dev logs, error pages, recaps). An earlier attempt to re-run the ingestion content filter on stored rows hid 344 real postings (stored summaries are truncated or enriched), so that fallback was removed and those flags reversed.

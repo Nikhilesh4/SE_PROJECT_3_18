@@ -92,7 +92,7 @@ class RssItemRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[RssItem]:
-        q = self._db.query(RssItem)
+        q = self._db.query(RssItem).filter(RssItem.visible())
         if category:
             q = q.filter(RssItem.category == category)
         q = q.order_by(RssItem.published_at.desc().nullslast(), RssItem.created_at.desc())
@@ -111,7 +111,7 @@ class RssItemRepository:
         )
 
     def count_items(self, *, category: str | None = None) -> int:
-        q = self._db.query(func.count(RssItem.id))
+        q = self._db.query(func.count(RssItem.id)).filter(RssItem.visible())
         if category:
             q = q.filter(RssItem.category == category)
         return q.scalar() or 0

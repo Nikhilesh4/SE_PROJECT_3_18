@@ -56,7 +56,7 @@ def notify_new_matches(
         rows = (
             db.query(RssItem, distance)
             .filter(RssItem.embedding.isnot(None), RssItem.created_at >= since, distance <= 1 - threshold,
-                    RssItem.id.notin_(hidden), ~RssItem.flags.any("scam-risk"))
+                    RssItem.id.notin_(hidden), ~RssItem.flags.any("scam-risk"), RssItem.visible())
             .order_by(distance)
             .limit(MAX_MATCHES_PER_USER_RUN)
             .all()
