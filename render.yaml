@@ -38,12 +38,8 @@ services:
       - {key: SMTP_PASSWORD, sync: false}
       - {key: SMTP_FROM, sync: false}
       - {key: SMTP_STARTTLS, sync: false}
-      # Optional discovery / job-source keys; leave blank to skip those sources.
-      - {key: ADZUNA_APP_ID, sync: false}
-      - {key: ADZUNA_APP_KEY, sync: false}
-      - {key: JOOBLE_API_KEY, sync: false}
-      - {key: TAVILY_API_KEY, sync: false}
-      - {key: BRAVE_API_KEY, sync: false}
+      # Optional job-source keys (ADZUNA_APP_ID/KEY, JOOBLE_API_KEY, TAVILY_API_KEY, BRAVE_API_KEY) are not
+      # listed here: add them later in the dashboard (Environment tab) if you get keys. Without them those sources are skipped.
 
   - type: keyvalue            # Redis: response cache, rate limits, live notifications
     name: unicompass-redis
