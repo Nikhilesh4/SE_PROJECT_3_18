@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authHeaders, BACKEND_URL } from "@/lib/server/backend";
 
 /**
  * Next.js API proxy for the feeds endpoint.
@@ -12,8 +13,6 @@ import { NextRequest, NextResponse } from "next/server";
  *   The frontend never calls the FastAPI backend directly; all traffic is
  *   proxied through this Next.js route, keeping the backend URL internal.
  */
-
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -34,11 +33,8 @@ export async function GET(request: NextRequest) {
 
     const backendEndpoint = `${BACKEND_URL}/api/feeds/rss${params.size > 0 ? `?${params}` : ""}`;
 
-    // ── Forward Authorization header if present ───────────────────────────────
-    // Required so the backend can (optionally) verify the user in the future.
-    const headers: Record<string, string> = { Accept: "application/json" };
-    const authHeader = request.headers.get("Authorization");
-    if (authHeader) headers["Authorization"] = authHeader;
+    // ── Authenticate as the signed-in user (httpOnly session cookie) ──────────
+    const headers: Record<string, string> = { Accept: "application/json", ...authHeaders(request) };
 
     try {
         console.log(`[Frontend API] Fetching: ${backendEndpoint}`);

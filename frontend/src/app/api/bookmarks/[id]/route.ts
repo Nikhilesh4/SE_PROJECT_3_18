@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authHeaders, BACKEND_URL, forbidden, isCrossSite } from "@/lib/server/backend";
 
 /**
  * Next.js API proxy for individual bookmark operations.
@@ -6,19 +7,17 @@ import { NextRequest, NextResponse } from "next/server";
  * DELETE /api/bookmarks/:id → FastAPI DELETE /api/bookmarks/:id (remove)
  */
 
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
-
 async function proxyRequest(
     request: NextRequest,
     method: string,
     id: string
 ) {
+    if (isCrossSite(request)) return forbidden();
     const headers: Record<string, string> = {
         Accept: "application/json",
         "Content-Type": "application/json",
+        ...authHeaders(request),
     };
-    const authHeader = request.headers.get("Authorization");
-    if (authHeader) headers["Authorization"] = authHeader;
 
     const endpoint = `${BACKEND_URL}/api/bookmarks/${id}`;
 

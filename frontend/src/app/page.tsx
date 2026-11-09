@@ -1,22 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getToken } from "@/lib/authSession";
+import { useSession } from "@/lib/authSession";
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const syncAuth = () => setIsLoggedIn(Boolean(getToken()));
-    syncAuth();
-    window.addEventListener("storage", syncAuth);
-    window.addEventListener("auth-changed", syncAuth);
-    return () => {
-      window.removeEventListener("storage", syncAuth);
-      window.removeEventListener("auth-changed", syncAuth);
-    };
-  }, []);
+  const isLoggedIn = useSession();
 
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">

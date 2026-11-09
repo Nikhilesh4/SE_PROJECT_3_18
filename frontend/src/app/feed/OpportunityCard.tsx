@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { NormalizedRssItem } from "@/lib/useFeed";
 import { plainText } from "@/lib/text";
+import { useFeedback } from "@/lib/useFeedback";
+import { DismissedCard, FeedbackButtons, isScamRisk, SignalChips, WhyThis } from "./CardSignals";
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
     internship: { bg: "bg-indigo-50",  text: "text-indigo-700",  dot: "bg-indigo-500"  },
@@ -88,6 +90,8 @@ interface Props {
 
 export default function OpportunityCard({ item, highlightSkills = [], isBookmarked = false, onToggleBookmark }: Props) {
     const [animating, setAnimating] = useState(false);
+    const { feedback } = useFeedback();
+    const dismissed = item.id != null ? feedback[String(item.id)] : undefined;
     const cat = CATEGORY_STYLES[item.category] ?? {
         bg: "bg-slate-100", text: "text-slate-700", dot: "bg-slate-500",
     };
@@ -116,10 +120,14 @@ export default function OpportunityCard({ item, highlightSkills = [], isBookmark
         return [...matched, ...unmatched].slice(0, 5);
     }, [item.tags, skillSet]);
 
+    if (item.id != null && (dismissed === "hide" || dismissed === "down")) {
+        return <DismissedCard itemId={item.id} title={item.title} />;
+    }
+
     return (
         <article
             className={`group flex flex-col gap-3 p-5 rounded-2xl bg-white border transition-all duration-200 shadow-sm hover:shadow-md ${
-                match.hasMatch
+                isScamRisk(item) ? "border-red-300 ring-1 ring-red-100" : match.hasMatch
                     ? "border-violet-300 hover:border-violet-400 ring-1 ring-violet-100"
                     : "border-slate-200 hover:border-indigo-200"
             }`}
@@ -144,6 +152,7 @@ export default function OpportunityCard({ item, highlightSkills = [], isBookmark
                 </div>
 
                 <div className="flex items-center gap-1">
+                    {item.id != null && <FeedbackButtons itemId={item.id} />}
                     {/* Bookmark button */}
                     {item.id != null && onToggleBookmark && (
                         <button
@@ -200,6 +209,8 @@ export default function OpportunityCard({ item, highlightSkills = [], isBookmark
             >
                 {item.title}
             </Link>
+
+            <SignalChips item={item} />
 
             {/* ── Match reason row ─────────────────────────────────── */}
             {/* Shows how the item was matched so the user understands relevance */}
@@ -273,6 +284,7 @@ export default function OpportunityCard({ item, highlightSkills = [], isBookmark
                     <span>{item.source_name}</span>
                 </span>
                 <div className="flex items-center gap-3">
+                    {item.id != null && <WhyThis itemId={item.id} detailHref={`/feed/${itemId}`} />}
                     {dateStr && <span>{dateStr}</span>}
                     <Link
                         href={`/feed/${itemId}`}

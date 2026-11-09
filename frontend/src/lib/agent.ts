@@ -9,7 +9,6 @@
  */
 
 import api, { API_BASE_URL } from "@/lib/api";
-import { getToken } from "@/lib/authSession";
 
 export interface ResultPreview {
     id?: number;
@@ -78,10 +77,7 @@ export async function streamChat(
 ): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/agent/chat`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken() ?? ""}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
             conversationId == null ? { message } : { message, conversation_id: conversationId }
         ),

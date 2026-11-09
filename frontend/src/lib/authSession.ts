@@ -1,34 +1,117 @@
 "use client";
 
-const TOKEN_KEY = "token";
-const COOKIE_KEY = "auth_token";
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
+/**
+ * Client-side view of the session.
+ *
+ * The JWT lives in an httpOnly cookie that scripts cannot read, so there is no
+ * token here. Signing in and out goes through the /api/session routes, and the
+ * UI asks GET /api/session whether someone is signed in.
+ */
 
-export function getToken(): string | null {
-    if (typeof window === "undefined") return null;
-    const local = localStorage.getItem(TOKEN_KEY);
-    if (local) return local;
+import { useEffect, useState } from "react";
 
-    const cookie = document.cookie
-        .split("; ")
-        .find((part) => part.startsWith(`${COOKIE_KEY}=`));
-    if (!cookie) return null;
-    return decodeURIComponent(cookie.split("=")[1] ?? "");
+export const AUTH_EVENT = "auth-changed";
+const CROSS_TAB_KEY = "unicompass_auth_event";
+const FEED_CACHE_KEY = "unicompass_feed_cache";
+
+/** Remove credentials stored by earlier versions (a JWT in localStorage and a script-readable cookie). */
+function purgeLegacyCredentials(): void {
+    try {
+        localStorage.removeItem("token");
+    } catch {
+        /* storage unavailable */
+    }
+    document.cookie = "auth_token=; Path=/; Max-Age=0; SameSite=Lax";
 }
 
-export function persistToken(token: string): void {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(TOKEN_KEY, token);
-    document.cookie = `${COOKIE_KEY}=${encodeURIComponent(token)}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
-    window.dispatchEvent(new Event("auth-changed"));
+/** Tell this tab's components, and other tabs, that the session changed. */
+function notifyAuthChanged(): void {
+    try {
+        localStorage.setItem(CROSS_TAB_KEY, String(Date.now()));
+    } catch {
+        /* storage unavailable */
+    }
+    window.dispatchEvent(new Event(AUTH_EVENT));
 }
 
-export function clearToken(): void {
-    if (typeof window === "undefined") return;
-    localStorage.removeItem(TOKEN_KEY);
-    // Clear cached feed so the next user never sees another account's ranked results
-    localStorage.removeItem("unicompass_feed_cache");
-    document.cookie = `${COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
-    window.dispatchEvent(new Event("auth-changed"));
+/** Drop locally cached data so the next account never sees this one's ranked results. */
+export function clearClientCaches(): void {
+    try {
+        localStorage.removeItem(FEED_CACHE_KEY);
+    } catch {
+        /* storage unavailable */
+    }
 }
 
+export async function fetchSession(): Promise<boolean> {
+    purgeLegacyCredentials();
+    try {
+        const res = await fetch("/api/session", { cache: "no-store" });
+        if (!res.ok) return false;
+        return Boolean((await res.json()).authenticated);
+    } catch {
+        return false;
+    }
+}
+
+/** Authenticated flag for the UI: null until the first check finishes. */
+export function useSession(): boolean | null {
+    const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        let alive = true;
+        const sync = () => {
+            fetchSession().then((value) => {
+                if (alive) setAuthenticated(value);
+            });
+        };
+        sync();
+        window.addEventListener("storage", sync); // other tabs
+        window.addEventListener(AUTH_EVENT, sync);
+        return () => {
+            alive = false;
+            window.removeEventListener("storage", sync);
+            window.removeEventListener(AUTH_EVENT, sync);
+        };
+    }, []);
+
+    return authenticated;
+}
+
+export class AuthRequestError extends Error {}
+
+async function postCredentials(path: string, payload: Record<string, string>, failure: string): Promise<void> {
+    let res: Response;
+    try {
+        res = await fetch(path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+    } catch {
+        throw new AuthRequestError(`${failure}. Please try again.`);
+    }
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new AuthRequestError(typeof body.detail === "string" ? body.detail : failure);
+    }
+    clearClientCaches();
+    notifyAuthChanged();
+}
+
+export function login(email: string, password: string): Promise<void> {
+    return postCredentials("/api/session/login", { email, password }, "Login failed");
+}
+
+export function register(name: string, email: string, password: string): Promise<void> {
+    return postCredentials("/api/session/register", { name, email, password }, "Registration failed");
+}
+
+export async function logout(): Promise<void> {
+    clearClientCaches();
+    try {
+        await fetch("/api/session/logout", { method: "POST" });
+    } finally {
+        notifyAuthChanged();
+    }
+}

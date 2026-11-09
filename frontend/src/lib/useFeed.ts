@@ -29,6 +29,15 @@ export interface NormalizedRssItem {
     tags: string[];
     author: string | null;
     guid: string | null;
+    /** Provenance: channel that found it ('rss', 'ats:greenhouse', 'hn_whoishiring', 'web_search', 'devpost', …) */
+    discovered_by?: string;
+    confidence?: number | null;
+    /** Warning flags, e.g. 'scam-risk' */
+    flags?: string[];
+    /** Present on /api/search results */
+    remote?: boolean;
+    stipend_inr_month?: number | null;
+    scam_risk?: number;
 }
 
 export interface FeedSourceStatus {

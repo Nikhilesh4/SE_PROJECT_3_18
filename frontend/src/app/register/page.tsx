@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api";
-import { persistToken } from "@/lib/authSession";
+import { AuthRequestError, register } from "@/lib/authSession";
 import { clearProfileCache } from "@/lib/useProfile";
 
 export default function RegisterPage() {
@@ -27,32 +26,15 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
-            const payload = {
-                name: formData.name,
-                email: formData.email,
-                password: formData.password,
-            };
+            // Registration signs the new user in (the server sets the session cookie).
+            // Clear any previous account's profile first.
+            clearProfileCache();
+            await register(formData.name, formData.email, formData.password);
 
-            // Register — the API now returns an access_token directly
-            // so we can auto-login without a second round-trip.
-            const { data } = await api.post("/auth/register", payload);
-
-            if (data.access_token) {
-                // Clear any previous account's profile before logging in as new account
-                clearProfileCache();
-                persistToken(data.access_token);
-                // Send new users straight to Profile so they can upload resume
-                router.push("/profile?new=true");
-            } else {
-                router.push("/login?registered=true");
-            }
+            // Send new users straight to Profile so they can upload resume
+            router.push("/profile?new=true");
         } catch (err: unknown) {
-            if (err && typeof err === "object" && "response" in err) {
-                const axiosErr = err as { response?: { data?: { detail?: string } } };
-                setError(axiosErr.response?.data?.detail || "Registration failed");
-            } else {
-                setError("Registration failed. Please try again.");
-            }
+            setError(err instanceof AuthRequestError ? err.message : "Registration failed. Please try again.");
         } finally {
             setLoading(false);
         }

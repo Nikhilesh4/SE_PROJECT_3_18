@@ -1,36 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getToken } from "@/lib/authSession";
+import { useSession } from "@/lib/authSession";
 
 /**
  * Auth guard hook.
- * Checks for JWT token in localStorage. If missing, redirects to /login.
- * Returns { isAuthenticated, token } once checked.
+ * Asks /api/session whether someone is signed in; if not, redirects to /login.
+ * Returns { isAuthenticated, checking } once checked.
  */
 export function useAuth() {
     const router = useRouter();
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [checking, setChecking] = useState(true);
+    const session = useSession();
 
     useEffect(() => {
-        const applyAuthState = () => {
-            const token = getToken();
-            const authenticated = Boolean(token);
-            setIsAuthenticated(authenticated);
-            if (!authenticated) router.replace("/login");
-            setChecking(false);
-        };
+        if (session === false) router.replace("/login");
+    }, [session, router]);
 
-        applyAuthState();
-        window.addEventListener("storage", applyAuthState);
-        window.addEventListener("auth-changed", applyAuthState);
-        return () => {
-            window.removeEventListener("storage", applyAuthState);
-            window.removeEventListener("auth-changed", applyAuthState);
-        };
-    }, [router]);
-
-    return { isAuthenticated, checking };
+    return { isAuthenticated: session === true, checking: session === null };
 }

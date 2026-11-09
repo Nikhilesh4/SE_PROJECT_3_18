@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authHeaders, BACKEND_URL } from "@/lib/server/backend";
 
 /**
  * Next.js API proxy for a single opportunity.
@@ -7,8 +8,6 @@ import { NextRequest, NextResponse } from "next/server";
  * `id` is the item's GUID, or its URL when the source has no GUID, so it may
  * contain slashes and must be re-encoded before forwarding.
  */
-
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 function safeDecode(value: string): string {
     try {
@@ -25,9 +24,7 @@ export async function GET(
     const { id } = await params;
     const endpoint = `${BACKEND_URL}/api/feeds/rss/${encodeURIComponent(safeDecode(id))}`;
 
-    const headers: Record<string, string> = { Accept: "application/json" };
-    const authHeader = request.headers.get("Authorization");
-    if (authHeader) headers["Authorization"] = authHeader;
+    const headers: Record<string, string> = { Accept: "application/json", ...authHeaders(request) };
 
     try {
         const res = await fetch(endpoint, {

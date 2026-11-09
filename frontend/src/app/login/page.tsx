@@ -3,8 +3,7 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api";
-import { persistToken } from "@/lib/authSession";
+import { AuthRequestError, login } from "@/lib/authSession";
 import { clearProfileCache } from "@/lib/useProfile";
 
 function LoginForm() {
@@ -26,26 +25,17 @@ function LoginForm() {
         setLoading(true);
 
         try {
-            const response = await api.post("/auth/login", formData);
-            const { access_token } = response.data;
-
             // Clear any previous account's profile from the in-memory singleton
-            // BEFORE persisting the new token. This prevents account A's cached
-            // skills from leaking into account B's session.
+            // BEFORE signing in, so account A's cached skills never leak into
+            // account B's session.
             clearProfileCache();
 
-            // Persist auth in both localStorage and cookie for UI consistency.
-            persistToken(access_token);
+            // The server sets the httpOnly session cookie; no token reaches this script.
+            await login(formData.email, formData.password);
 
-            // Redirect to feed
             router.push("/feed");
         } catch (err: unknown) {
-            if (err && typeof err === "object" && "response" in err) {
-                const axiosErr = err as { response?: { data?: { detail?: string } } };
-                setError(axiosErr.response?.data?.detail || "Login failed");
-            } else {
-                setError("Login failed. Please try again.");
-            }
+            setError(err instanceof AuthRequestError ? err.message : "Login failed. Please try again.");
         } finally {
             setLoading(false);
         }

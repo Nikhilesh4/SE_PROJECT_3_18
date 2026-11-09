@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { htmlToPlainText } from "@/lib/text";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { useBookmarks } from "@/lib/useBookmarks";
 import { NormalizedRssItem, RssAggregationResponse } from "@/lib/useFeed";
 import AskPosting from "./AskPosting";
+import InsightsPanel from "./InsightsPanel";
+import InterviewPanel from "./InterviewPanel";
+import OutreachPanel from "./OutreachPanel";
+import { SignalChips } from "../CardSignals";
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string; icon: string }> = {
     internship: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200", icon: "🎓" },
@@ -45,6 +50,8 @@ function formatTime(iso: string | null): string {
 export default function OpportunityDetailPage() {
     const { isAuthenticated, checking: authChecking } = useAuth();
     const params = useParams();
+    const searchParams = useSearchParams();
+    const byDatabaseId = searchParams.get("by") === "id";
     const router = useRouter();
     const [item, setItem] = useState<NormalizedRssItem | null>(null);
     const [loading, setLoading] = useState(true);
@@ -56,6 +63,31 @@ export default function OpportunityDetailPage() {
 
     useEffect(() => {
         if (!itemId || authChecking || !isAuthenticated) return;
+
+        // Links from notifications and missions carry the numeric database id and say so
+        // with ?by=id, so a feed item whose GUID happens to be numeric is never mistaken for one.
+        if (byDatabaseId && /^\d+$/.test(itemId)) {
+            (async () => {
+                try {
+                    const res = await fetch(`/api/backend/api/feeds/items/${itemId}`);
+                    if (res.ok) {
+                        setItem(await res.json());
+                        setLoading(false);
+                        return;
+                    }
+                } catch { /* fall through to GUID lookup */ }
+                try {
+                    const res = await fetch(`/api/feeds/${encodeURIComponent(itemId)}`);
+                    if (res.ok) setItem(await res.json());
+                    else setNotFound(true);
+                } catch {
+                    setNotFound(true);
+                } finally {
+                    setLoading(false);
+                }
+            })();
+            return;
+        }
 
         // First try localStorage cache
         try {
@@ -89,7 +121,7 @@ export default function OpportunityDetailPage() {
                 setLoading(false);
             }
         })();
-    }, [itemId, authChecking, isAuthenticated]);
+    }, [itemId, byDatabaseId, authChecking, isAuthenticated]);
 
     // Auth spinner
     if (authChecking || !isAuthenticated) {
@@ -183,6 +215,8 @@ export default function OpportunityDetailPage() {
                             {item.title}
                         </h1>
 
+                        <div className="mb-3"><SignalChips item={item} /></div>
+
                         {item.author && (
                             <p className="text-slate-600 text-sm flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -229,10 +263,10 @@ export default function OpportunityDetailPage() {
                             Description
                         </h2>
                         {item.summary ? (
-                            <div
-                                className="text-slate-700 text-sm leading-relaxed space-y-3 prose prose-slate prose-sm max-w-none"
-                                dangerouslySetInnerHTML={{ __html: item.summary }}
-                            />
+                            // Plain text only: summaries come from third-party feeds and scraped pages.
+                            <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line break-words">
+                                {htmlToPlainText(item.summary)}
+                            </p>
                         ) : (
                             <p className="text-slate-500 text-sm italic">No description available for this opportunity.</p>
                         )}
@@ -261,8 +295,13 @@ export default function OpportunityDetailPage() {
                         </div>
                     )}
 
+                    {/* Personalised insights, outreach and interview practice */}
+                    {item.id != null && <InsightsPanel itemId={item.id} />}
+
                     {/* Posting Q&A (RAG) */}
                     {item.id != null && <AskPosting itemId={item.id} />}
+                    {item.id != null && <OutreachPanel itemId={item.id} />}
+                    {item.id != null && <InterviewPanel itemId={item.id} />}
 
                     {/* Action buttons */}
                     <div className="p-6 sm:p-8 border-t border-slate-200 bg-slate-50">

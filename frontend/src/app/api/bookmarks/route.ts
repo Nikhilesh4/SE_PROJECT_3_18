@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authHeaders, BACKEND_URL } from "@/lib/server/backend";
 
 /**
  * Next.js API proxy for bookmark list endpoints.
@@ -6,15 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
  * GET /api/bookmarks?ids  → FastAPI GET /api/bookmarks/ids  (if 'ids' param present)
  */
 
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
-
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
-    const headers: Record<string, string> = { Accept: "application/json" };
-
-    // Forward Authorization header
-    const authHeader = request.headers.get("Authorization");
-    if (authHeader) headers["Authorization"] = authHeader;
+    const headers: Record<string, string> = { Accept: "application/json", ...authHeaders(request) };
 
     // Check if this is a request for bookmark IDs
     const wantIds = searchParams.has("ids");
