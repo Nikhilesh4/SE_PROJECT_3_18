@@ -9,7 +9,7 @@ python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 pymupdf
-google-generativeai
+google-genai
 fastembed  # local ONNX runtime for the sentence-transformers/all-MiniLM-L6-v2 embedding model
 pgvector
 websockets

@@ -13,9 +13,11 @@ from app.services.errors import (
 )
 
 try:
-    import google.generativeai as genai
+    from google import genai
 except Exception:  # pragma: no cover - optional import fallback
     genai = None
+
+GEMINI_MODEL = "gemini-2.5-flash"
 
 
 PROMPT = """You are a resume parser.
@@ -32,11 +34,10 @@ Do not return markdown, code fences, or explanation text.
 class AIProfileAdapter:
     def __init__(self) -> None:
         self._preferred_provider = (settings.PROFILE_AI_PROVIDER or "groq").lower()
-        self._gemini_model = None
+        self._gemini_client = None
 
         if settings.GEMINI_API_KEY and genai is not None:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self._gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+            self._gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def structure(self, resume_text: str) -> ProfileStructured:
         text = resume_text[:20000]
@@ -114,13 +115,14 @@ class AIProfileAdapter:
             raise AIResponseParseError("Groq response is missing content") from exc
 
     async def _call_gemini(self, text: str) -> str:
-        if self._gemini_model is None:
+        if self._gemini_client is None:
             raise AIServiceUnavailableError("Gemini is not configured")
 
         try:
             async with asyncio.timeout(15):
-                response = await self._gemini_model.generate_content_async(
-                    f"{PROMPT}\n\n{text}"
+                response = await self._gemini_client.aio.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=f"{PROMPT}\n\n{text}",
                 )
         except TimeoutError as exc:
             raise AIServiceTimeoutError("Gemini request timed out") from exc

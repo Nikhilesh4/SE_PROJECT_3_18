@@ -37,11 +37,6 @@ FEED_SOURCES: tuple[FeedSource, ...] = (
     # ── INTERNSHIPS ────────────────────────────────────────────────────────
     # Verified 200 ✓
     FeedSource(
-        "https://remoteok.com/remote-intern-jobs.rss",
-        "internship",
-        "RemoteOK – Internships",
-    ),
-    FeedSource(
         "https://jobicy.com/?feed=job_feed&job_types=internship",
         "internship",
         "Jobicy – Internships",
@@ -64,9 +59,6 @@ FEED_SOURCES: tuple[FeedSource, ...] = (
 
     # ── JOBS ───────────────────────────────────────────────────────────────
     # Verified 200 ✓
-    FeedSource("https://remoteok.com/remote-jobs.rss", "job", "RemoteOK"),
-    FeedSource("https://remoteok.com/remote-dev-jobs.rss", "job", "RemoteOK – Dev"),
-    FeedSource("https://remoteok.com/remote-design-jobs.rss", "job", "RemoteOK – Design"),
     FeedSource("https://weworkremotely.com/remote-jobs.rss", "job", "We Work Remotely"),
     FeedSource(
         "https://weworkremotely.com/categories/remote-programming-jobs.rss",
@@ -182,11 +174,6 @@ FEED_SOURCES: tuple[FeedSource, ...] = (
     ),
     FeedSource("https://jobs.wordpress.net/feed/", "freelance", "WordPress Jobs"),
     FeedSource("https://dribbble.com/jobs.rss", "freelance", "Dribbble Jobs"),
-    FeedSource(
-        "https://remoteok.com/remote-freelance-jobs.rss",
-        "freelance",
-        "RemoteOK – Freelance",
-    ),
 
     # ── COURSES ────────────────────────────────────────────────────────────
     # COURSE NOTE

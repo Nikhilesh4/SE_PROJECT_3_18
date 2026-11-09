@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { NormalizedRssItem } from "@/lib/useFeed";
+import { plainText } from "@/lib/text";
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
     internship: { bg: "bg-indigo-50",  text: "text-indigo-700",  dot: "bg-indigo-500"  },
@@ -234,7 +235,7 @@ export default function OpportunityCard({ item, highlightSkills = [], isBookmark
             {/* ── Summary ──────────────────────────────────────────── */}
             {item.summary && (
                 <p className="text-slate-600 text-sm leading-relaxed line-clamp-3">
-                    {item.summary.replace(/<[^>]+>/g, " ").slice(0, 200)}
+                    {plainText(item.summary).slice(0, 200)}
                 </p>
             )}
 

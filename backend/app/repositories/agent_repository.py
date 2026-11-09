@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from sqlalchemy import func
+from sqlalchemy import exists, func
 from sqlalchemy.orm import Session
 
 from app.models.agent import AgentConversation, AgentMessage
@@ -39,6 +39,11 @@ class AgentRepository:
         return (
             self._db.query(AgentConversation)
             .filter(AgentConversation.user_id == user_id)
+            # A first message that failed leaves a conversation with no saved
+            # messages; keep it out of the sidebar (retrying in it still works).
+            .filter(
+                exists().where(AgentMessage.conversation_id == AgentConversation.id)
+            )
             .order_by(AgentConversation.updated_at.desc())
             .limit(limit)
             .all()

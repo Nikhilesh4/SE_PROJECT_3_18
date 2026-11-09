@@ -184,7 +184,7 @@ function FeedPageInner() {
                             </h1>
                             <p className="mt-1 text-slate-600 text-sm">
                                 {data
-                                    ? `${data.total_items.toLocaleString()} opportunities from ${data.sources.length} sources · refreshed ${new Date(data.fetched_at).toLocaleTimeString()}`
+                                    ? `${data.total_items.toLocaleString()} opportunities${data.sources.length > 0 ? ` from ${data.sources.length} sources` : ""} · refreshed ${new Date(data.fetched_at).toLocaleTimeString()}`
                                     : "Fetching live opportunities…"}
                             </p>
                         </div>
@@ -324,23 +324,23 @@ function FeedPageInner() {
                         {hasProfile && profile && (
                             <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
                                 <p className="text-xs font-semibold text-violet-700 uppercase tracking-wider mb-2">
-                                    Your Skills
+                                    Your Skills &amp; Interests
                                 </p>
                                 <div className="flex flex-wrap gap-1">
-                                    {profile.skills.slice(0, 8).map((s) => (
+                                    {[...profile.skills, ...profile.interests].slice(0, 8).map((s) => (
                                         <span key={s} className="px-2 py-0.5 rounded text-xs bg-white border border-violet-200 text-violet-700">
                                             {s}
                                         </span>
                                     ))}
-                                    {profile.skills.length > 8 && (
-                                        <span className="text-xs text-violet-500">+{profile.skills.length - 8}</span>
+                                    {(profile.skills.length + profile.interests.length) > 8 && (
+                                        <span className="text-xs text-violet-500">+{profile.skills.length + profile.interests.length - 8}</span>
                                     )}
                                 </div>
                             </div>
                         )}
 
                         {/* Source status panel */}
-                        {data && <SourceStatusPanel sources={data.sources} />}
+                        {data && data.sources.length > 0 && <SourceStatusPanel sources={data.sources} />}
                     </aside>
 
                     {/* ── Main content ── */}

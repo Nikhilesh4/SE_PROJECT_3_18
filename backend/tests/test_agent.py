@@ -233,8 +233,11 @@ def test_provider_failure_persists_nothing_and_can_retry(client, auth_headers, u
     assert {"type": "error", "message": "Groq is rate-limiting requests; try again shortly."} in events
     conv_id = events[0]["id"]
     assert client.get(f"/agent/conversations/{conv_id}", headers=auth_headers).json()["messages"] == []
+    # The empty chat stays out of the sidebar until something is saved in it.
+    assert client.get("/agent/conversations", headers=auth_headers).json() == []
 
     chat(client, auth_headers, "hi", conversation_id=conv_id)
+    assert [c["id"] for c in client.get("/agent/conversations", headers=auth_headers).json()] == [conv_id]
     roles = [m["role"] for m in client.get(f"/agent/conversations/{conv_id}", headers=auth_headers).json()["messages"]]
     assert roles == ["user", "assistant"]
 
