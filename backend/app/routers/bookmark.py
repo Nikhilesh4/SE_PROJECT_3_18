@@ -117,6 +117,9 @@ def list_bookmarks(
             tags=item.tags or [],
             author=item.author,
             guid=item.guid,
+            discovered_by=item.discovered_by or "rss",
+            confidence=item.confidence,
+            flags=list(item.flags or []),
         )
         for item in items
     ]

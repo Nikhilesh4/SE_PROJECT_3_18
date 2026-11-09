@@ -1,0 +1,6 @@
+# Replace item ids with real ones from your database (GET /api/feeds/rss shows them).
+{"question": "What is the monthly stipend?", "item_id": 1, "expected": ["stipend", "per month", "/month"]}
+{"question": "Is this role remote?", "item_id": 1, "expected": ["remote", "work from home"]}
+{"question": "Who is eligible to apply?", "item_id": 1, "expected": ["eligible", "students", "batch", "graduat"]}
+{"question": "Does it sponsor visas?", "item_id": 1, "expect_not_stated": true}
+{"question": "remote machine learning internship", "expected_item_id": 1}

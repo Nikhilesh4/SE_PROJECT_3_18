@@ -47,6 +47,9 @@ class RssItemRepository:
                 "feed_url": item.feed_url,
                 "tags": item.tags,
                 "author": item.author,
+                "discovered_by": item.discovered_by,
+                "confidence": item.confidence,
+                "flags": item.flags,
             }
         rows = list(seen.values())
 
@@ -60,6 +63,8 @@ class RssItemRepository:
                 "application_deadline": stmt.excluded.application_deadline,
                 "tags": stmt.excluded.tags,
                 "author": stmt.excluded.author,
+                # Keep whichever channel saw it first and any flags a verifier set.
+                "confidence": func.coalesce(stmt.excluded.confidence, RssItem.confidence),
                 # Re-embed only when the embedded text actually changed.
                 "embedding": case(
                     (

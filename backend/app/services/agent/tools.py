@@ -21,6 +21,7 @@ from mcp import Client
 from unicompass_mcp.api import Credentials, UniCompassAPI
 from unicompass_mcp.server import create_server
 
+from app.services.agent.mcp_clients import ExternalTools
 from app.services.agent.providers import ToolCall, ToolOutcome, ToolSpec
 
 MAX_RESULT_CHARS = 12_000
@@ -33,6 +34,7 @@ class Toolbox:
         self._stack: AsyncExitStack | None = None
         self._client: Client | None = None
         self.specs: list[ToolSpec] = []
+        self._external = ExternalTools()
 
     async def __aenter__(self) -> "Toolbox":
         def api_factory() -> UniCompassAPI:
@@ -49,6 +51,8 @@ class Toolbox:
             ToolSpec(name=t.name, description=t.description or "", input_schema=t.input_schema)
             for t in listed.tools
         ]
+        await self._external.start(self._stack)  # optional servers; failures are skipped, not raised
+        self.specs += self._external.specs
         return self
 
     async def __aexit__(self, *exc) -> None:
@@ -64,6 +68,14 @@ class Toolbox:
                 is_error=True,
             )
         assert self._client is not None, "Toolbox used outside 'async with'"
+        if self._external.owns(call.name):
+            try:
+                text, is_error = await self._external.call(call.name, call.arguments)
+            except Exception as exc:  # noqa: BLE001 — surfaced to the model as a tool error
+                return ToolOutcome(call, f"{call.name} failed: {exc.__class__.__name__}", is_error=True)
+            if len(text) > MAX_RESULT_CHARS:
+                text = text[:MAX_RESULT_CHARS] + " …[truncated]"
+            return ToolOutcome(call, text, is_error=is_error)
         result = await self._client.call_tool(call.name, call.arguments)
         if result.is_error:
             text = " ".join(getattr(c, "text", "") for c in result.content).strip()

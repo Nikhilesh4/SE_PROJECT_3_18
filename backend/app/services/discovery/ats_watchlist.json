@@ -1,0 +1,5 @@
+[
+  {"vendor": "greenhouse", "token": "stripe", "name": "Stripe"},
+  {"vendor": "lever", "token": "palantir", "name": "Palantir"},
+  {"vendor": "ashby", "token": "ramp", "name": "Ramp"}
+]

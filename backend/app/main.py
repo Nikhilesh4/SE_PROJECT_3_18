@@ -8,10 +8,8 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.migrations import run_migrations
 from app.rate_limit import limiter, rate_limit_exceeded_handler
-from app.routers import agent, auth, bookmark, feeds, profile, rag
-from app.workers.rss_refresh_worker import rss_refresh_loop
-from app.workers.ingestion_worker import ingestion_loop
-from app.workers.embedding_worker import embedding_loop
+from app.routers import agent, applications, auth, bookmark, coach, feeds, insights, missions, notifications, profile, rag
+from app.workers.runner import start_workers, stop_workers
 
 
 @asynccontextmanager
@@ -21,20 +19,11 @@ async def lifespan(_: FastAPI):
     if settings.RUN_MIGRATIONS_ON_STARTUP:
         await asyncio.to_thread(run_migrations)
 
-    rss_task = asyncio.create_task(rss_refresh_loop(), name="rss-refresh-worker")
-    ingestion_task = asyncio.create_task(ingestion_loop(), name="ingestion-worker")
-    embedding_task = asyncio.create_task(embedding_loop(), name="embedding-worker")
+    tasks = start_workers() if settings.RUN_WORKERS_IN_API else []
     try:
         yield
     finally:
-        tasks = (rss_task, ingestion_task, embedding_task)
-        for task in tasks:
-            task.cancel()
-        for task in tasks:
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        await stop_workers(tasks)
 
 
 app = FastAPI(
@@ -72,6 +61,11 @@ app.include_router(feeds.router, prefix="/api")
 app.include_router(profile.router)
 app.include_router(agent.router)
 app.include_router(rag.router, prefix="/api")
+app.include_router(applications.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
+app.include_router(insights.router, prefix="/api")
+app.include_router(missions.router, prefix="/api")
+app.include_router(coach.router, prefix="/api")
 
 
 @app.get("/")

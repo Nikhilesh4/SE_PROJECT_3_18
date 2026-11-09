@@ -191,10 +191,15 @@ class RssCacheService:
             tags=row.tags or [],
             author=row.author,
             guid=row.guid,
+            discovered_by=row.discovered_by or "rss",
+            confidence=row.confidence,
+            flags=list(row.flags or []),
         )
 
     @staticmethod
     def _is_active_item(row: RssItem) -> bool:
+        if "not-opportunity" in (row.flags or []):
+            return False
         now = datetime.now(timezone.utc)
         if row.application_deadline is not None:
             return RssCacheService._as_utc(row.application_deadline) >= now

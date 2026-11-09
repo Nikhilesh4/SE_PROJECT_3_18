@@ -17,6 +17,47 @@ services:
     ports:
       - "6379:6379"
 
+  # ── Application services (optional: for local dev you can also run uvicorn directly) ──
+  # Start with:  docker compose --profile app up --build
+  api:
+    profiles: ["app"]
+    build: {context: ., dockerfile: backend/Dockerfile}
+    container_name: unicompass-api
+    environment: &app-env
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/unicompass
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY (32+ chars) in your shell or a .env file next to this compose file}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AGENT_PROVIDER: ${AGENT_PROVIDER:-groq}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID:-}
+      ADZUNA_APP_KEY: ${ADZUNA_APP_KEY:-}
+      JOOBLE_API_KEY: ${JOOBLE_API_KEY:-}
+      RUN_WORKERS_IN_API: "false"      # workers live in their own container
+      RATE_LIMIT_STORAGE_URI: redis://redis:6379/1
+    depends_on: [postgres, redis]
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # Feed refresh, ingestion, embeddings, notifications, missions and discovery agents.
+  # Separate from the API so slow fetches and model work never delay requests.
+  worker:
+    profiles: ["app"]
+    build: {context: ., dockerfile: backend/Dockerfile}
+    container_name: unicompass-worker
+    command: ["python", "-m", "app.worker_main"]
+    environment:
+      <<: *app-env
+      RUN_MIGRATIONS_ON_STARTUP: "false"  # the API container migrates
+    volumes:
+      - model-cache:/app/backend/.cache   # embedding model (~90 MB) downloads once
+    depends_on: [postgres, redis, api]
+    restart: unless-stopped
+
   rss-bridge:
     image: rssbridge/rss-bridge
     container_name: unicompass-rss-bridge
@@ -26,3 +67,4 @@ services:
 
 volumes:
   pgdata:
+  model-cache:

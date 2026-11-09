@@ -20,8 +20,13 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
+from app.db import get_db
+from app.middleware.auth import get_optional_user
+from app.models.activity import ItemFeedback
+from app.models.user import User
 from app.schemas.rss_item import NormalizedRssItem, RssAggregationResponse
 from app.services.matching.semantic import item_similarities, query_vector
 from app.services.rss.cache_service import cache_service
@@ -225,6 +230,22 @@ class DefaultFetchStrategy(FeedFetchStrategy):
         )
 
 
+def _drop_dismissed(response: RssAggregationResponse, user: Optional[User], db: Session) -> RssAggregationResponse:
+    """Per-user filter applied after the shared cache, so one user's feedback never leaks to others."""
+    if user is None:
+        return response
+    dismissed = {
+        r[0]
+        for r in db.query(ItemFeedback.rss_item_id).filter(
+            ItemFeedback.user_id == user.id, ItemFeedback.value.in_(("hide", "down"))
+        )
+    }
+    if not dismissed:
+        return response
+    kept = [i for i in response.items if i.id not in dismissed]
+    return response.model_copy(update={"items": kept, "total_items": len(kept)})
+
+
 # ── Main Feed Endpoint ────────────────────────────────────────────────────────
 
 @router.get("/rss", response_model=RssAggregationResponse)
@@ -243,9 +264,12 @@ def list_rss_opportunities(
         ),
     ),
     limit_per_feed: Optional[int] = Query(None, ge=1, le=500),
+    user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db),
 ) -> RssAggregationResponse:
     """
     Return opportunities from the DB, optionally re-ranked by skill relevance.
+    Signed-in users never see postings they hid or thumbed down.
 
     CRITICAL DESIGN — Relevance mode vs. Default mode:
 
@@ -288,7 +312,7 @@ def list_rss_opportunities(
     if cached is not None:
         response = RssAggregationResponse(**cached)
         response.from_cache = True
-        return response
+        return _drop_dismissed(response, user, db)
 
     # ── Cache MISS: select and execute the appropriate strategy ─────────────
     strategy: FeedFetchStrategy
@@ -311,7 +335,7 @@ def list_rss_opportunities(
     # Serialise BEFORE setting from_cache so the flag is never baked into Redis.
     redis_cache.set(cache_key, result.model_dump(mode="json"), ttl_seconds=_FEED_TTL)
     result.from_cache = False
-    return result
+    return _drop_dismissed(result, user, db)
 
 
 # ── Supporting Endpoints ──────────────────────────────────────────────────────

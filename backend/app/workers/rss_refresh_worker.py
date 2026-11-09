@@ -29,6 +29,11 @@ CHECK_INTERVAL_SECONDS = 60
 
 
 async def _refresh_category(category: str) -> None:
+    """Run the (blocking) refresh in a thread so the event loop stays responsive."""
+    await asyncio.to_thread(_refresh_category_sync, category)
+
+
+def _refresh_category_sync(category: str) -> None:
     """Fetch all feeds for a single category and persist to DB."""
     sources = [s for s in FEED_SOURCES if s.category == category]
 

@@ -45,12 +45,14 @@ async def _run_ingestion_cycle() -> dict:
         return {"fetched": 0, "upserted": 0}
 
     # Persist to PostgreSQL
-    db = SessionLocal()
-    try:
-        repo = RssItemRepository(db)
-        upserted = repo.upsert_items(items)
-    finally:
-        db.close()
+    def _persist() -> int:
+        db = SessionLocal()
+        try:
+            return RssItemRepository(db).upsert_items(items)
+        finally:
+            db.close()
+
+    upserted = await asyncio.to_thread(_persist)
 
     logger.info(
         "Ingestion cycle complete: fetched=%d, upserted=%d",
@@ -62,7 +64,7 @@ async def _run_ingestion_cycle() -> dict:
     # After every successful ingestion batch, wipe the entire feed cache so
     # the next API request always returns freshly persisted data.
     # Pattern: Cache-Aside invalidation triggered by a write-behind event.
-    invalidated = redis_cache.delete_pattern("feed:*")
+    invalidated = await asyncio.to_thread(redis_cache.delete_pattern, "feed:*")
     logger.info("Ingestion: invalidated %d feed cache keys after batch", invalidated)
 
     return {"fetched": len(items), "upserted": upserted}

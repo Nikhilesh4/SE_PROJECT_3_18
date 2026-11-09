@@ -1,0 +1,11 @@
+**/node_modules
+**/venv
+**/.venv
+**/__pycache__
+**/.cache
+.git
+frontend
+docs
+*.pdf
+backend/.env*
+backend/.secret_key

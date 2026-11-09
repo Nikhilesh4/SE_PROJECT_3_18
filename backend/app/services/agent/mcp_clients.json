@@ -1,0 +1,21 @@
+{
+  "_comment": "External MCP servers for the Compass Agent. Every server ships disabled. Set enabled=true, install the server, and export the env vars it needs. Package names below are examples; use the server you trust. Tools that send/delete/post are withheld unless listed in allow_write.",
+  "servers": [
+    {"name": "gcal", "enabled": false, "command": "npx", "args": ["-y", "<google-calendar-mcp-package>"],
+     "requires_env": ["GOOGLE_OAUTH_CREDENTIALS"], "env": {"GOOGLE_OAUTH_CREDENTIALS": "${GOOGLE_OAUTH_CREDENTIALS}"},
+     "allow": ["list-events", "search-events"], "allow_write": ["create-event"]},
+    {"name": "gmail", "enabled": false, "command": "npx", "args": ["-y", "<gmail-mcp-package>"],
+     "requires_env": ["GMAIL_CREDENTIALS"], "env": {"GMAIL_CREDENTIALS": "${GMAIL_CREDENTIALS}"},
+     "allow": ["search_emails", "read_email", "draft_email"]},
+    {"name": "github", "enabled": false, "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"],
+     "requires_env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"},
+     "allow": ["search_repositories", "get_file_contents", "list_commits"]},
+    {"name": "notion", "enabled": false, "command": "npx", "args": ["-y", "@notionhq/notion-mcp-server"],
+     "requires_env": ["NOTION_TOKEN"], "env": {"NOTION_TOKEN": "${NOTION_TOKEN}"}, "allow_write": ["API-post-page"]},
+    {"name": "fetch", "enabled": false, "command": "uvx", "args": ["mcp-server-fetch"]},
+    {"name": "brave", "enabled": false, "command": "npx", "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+     "requires_env": ["BRAVE_API_KEY"], "env": {"BRAVE_API_KEY": "${BRAVE_API_KEY}"}},
+    {"name": "playwright", "enabled": false, "command": "npx", "args": ["-y", "@playwright/mcp@latest", "--headless"],
+     "allow": ["browser_navigate", "browser_snapshot", "browser_close", "browser_wait_for"]}
+  ]
+}

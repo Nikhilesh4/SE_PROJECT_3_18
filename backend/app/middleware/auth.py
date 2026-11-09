@@ -51,3 +51,19 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+
+_optional_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+
+def get_optional_user(
+    token: Optional[str] = Depends(_optional_scheme), db: Session = Depends(get_db)
+) -> Optional[User]:
+    """The signed-in user, or None for anonymous requests / bad tokens (never raises)."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return db.query(User).filter(User.id == payload.get("sub")).first()
+    except (JWTError, ValueError):
+        return None

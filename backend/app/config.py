@@ -92,6 +92,8 @@ class Settings(BaseSettings):
     # Compass Agent (in-app assistant)
     AGENT_PROVIDER: str = os.getenv("AGENT_PROVIDER", "groq")  # "groq" | "anthropic"
     AGENT_MODEL: str = os.getenv("AGENT_MODEL", "")  # empty → provider default
+    # JSON file listing external MCP servers the agent may use (see services/agent/mcp_clients.py); empty = bundled default
+    MCP_CLIENTS_PATH: str = os.getenv("MCP_CLIENTS_PATH", "")
     AGENT_MAX_TOOL_ROUNDS: int = 8
     AGENT_MAX_MESSAGES_PER_CONVERSATION: int = 200
 
@@ -122,6 +124,25 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT: str = "10/minute"
     REGISTER_RATE_LIMIT: str = "10/hour"
     UPLOAD_RATE_LIMIT: str = "10/hour"
+
+    # Run the background workers inside the API process (convenient for a
+    # one-command dev start). In production set this to false and run
+    # `python -m app.worker_main` as its own process/container.
+    RUN_WORKERS_IN_API: bool = True
+
+    # Comma-separated emails allowed to trigger discovery runs and review agent traces
+    ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")
+
+    # Discovery channels (phase 6). All optional; a channel with no credentials is skipped.
+    DISCOVERY_ENABLED: bool = True
+    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+    BRAVE_API_KEY: str = os.getenv("BRAVE_API_KEY", "")
+    SEMANTIC_SCHOLAR_API_KEY: str = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
+    GITHUB_TOKEN: str = os.getenv("GITHUB_TOKEN", "")
+    # JSON file with the company watchlist for ATS career boards
+    ATS_WATCHLIST_PATH: str = str(BASE_DIR / "app" / "services" / "discovery" / "ats_watchlist.json")
+    # Domains the browser/fetch agents may open for the enricher (comma-separated; empty = any public http(s) host)
+    FETCH_ALLOWED_DOMAINS: str = os.getenv("FETCH_ALLOWED_DOMAINS", "")
 
     # RSS Refresh
     RSS_REFRESH_ENABLED: bool = True

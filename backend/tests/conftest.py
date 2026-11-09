@@ -87,6 +87,17 @@ def fake_redis(monkeypatch):
     return store
 
 
+@pytest.fixture(autouse=True)
+def no_llm(monkeypatch):
+    """Background agents fall back to templates; tests never reach a real model."""
+    from app.services import llm
+
+    def unavailable():
+        raise RuntimeError("no LLM in tests")
+
+    monkeypatch.setattr(llm, "provider_factory", unavailable)
+
+
 class FakeEmbedder(embeddings.EmbeddingProvider):
     """
     Deterministic stand-in for the real model (no download, no ONNX).

@@ -251,3 +251,27 @@ FEED_SOURCES: tuple[FeedSource, ...] = (
         "FutureLearn – New Programs",
     ),
 )
+
+
+# ── Admin-approved additions (proposed by the Source Scout, see discovery/source_scout.py) ──
+# Stored in approved_feeds.json next to this file; loaded at import, so a restart picks up new ones.
+import json as _json
+from pathlib import Path as _Path
+
+APPROVED_FEEDS_PATH = _Path(__file__).with_name("approved_feeds.json")
+_VALID_CATEGORIES = {"internship", "hackathon", "research", "job", "freelance", "course"}
+
+
+def load_approved_feeds(path: _Path = APPROVED_FEEDS_PATH) -> tuple[FeedSource, ...]:
+    try:
+        rows = _json.loads(path.read_text())
+    except (OSError, ValueError):
+        return ()
+    return tuple(
+        FeedSource(r["url"], r["category"], r["source_name"])
+        for r in rows
+        if isinstance(r, dict) and r.get("category") in _VALID_CATEGORIES and str(r.get("url", "")).startswith("http") and r.get("source_name")
+    )
+
+
+FEED_SOURCES = FEED_SOURCES + tuple(s for s in load_approved_feeds() if s.url not in {f.url for f in FEED_SOURCES})

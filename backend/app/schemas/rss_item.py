@@ -31,6 +31,10 @@ class NormalizedRssItem(BaseModel):
     tags: list[str] = Field(default_factory=list)
     author: str | None = None
     guid: str | None = None
+    # Provenance (see rss_items): channel that found it, confidence, warning flags.
+    discovered_by: str = "rss"
+    confidence: float | None = None
+    flags: list[str] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
