@@ -1,11 +1,13 @@
 # UniCompass: Agentic Roadmap and Implementation Status
 
-> Last updated: 2026-10-29 · Branch: `agentic-roadmap` (not merged into `main`, not pushed)
+> Last updated: 2026-11-09 · Branch: `agentic-roadmap` (not merged into `main`, not pushed)
 
 This document tracks the plan to finish UniCompass and turn it into an agentic, MCP-connected
 career platform. It covers what is built, what is in progress, and everything still to do.
 
-**Status legend:** ✅ Done and committed · 🟡 Built and tested but not committed · ⬜ Not started
+**Status legend:** ✅ Done and committed · 🟢 Committed, automated tests pass, never run against a real LLM or search key · ⬜ Not started
+
+> **Update 2026-11-09:** phases 6–8, G2 (SSE instead of WebSocket), G8 (separate worker container) and the cookie-session half of G9 are implemented and committed. Sections 5.1–5.5 below keep the original plan for reference. What is genuinely left is listed in §10.
 
 ---
 
@@ -30,17 +32,17 @@ The roadmap had three goals:
 | 2 | Semantic matching with pgvector embeddings (FR-4) | ✅ | `ef3ef2c` |
 | 3 | UniCompass MCP server | ✅ | `e5ce779` |
 | 4 | Compass Assistant (in-app agent) | ✅ | `c194e01` |
-| 5 | RAG over posting text | 🟡 | (uncommitted) |
-| 6 | New discovery channels (ATS boards, HN, web search, research scout) | ⬜ | |
-| 7 | Multi-agent discovery pipeline, Missions, notifications, digest/deadline agents | ⬜ | |
-| 8 | External MCP clients (Calendar, Gmail, GitHub, Playwright) and extra ideas | ⬜ | |
+| 5 | RAG over posting text | ✅ | `8842d1d` |
+| 6 | New discovery channels (ATS boards, HN, web search, scholarly, Devpost, programs, Source Scout) | 🟢 built, untested with a real LLM/search key | `2a83c6f` |
+| 7 | Discovery pipeline, Missions, SSE notifications, digest, tracker, insights, coach | 🟢 built, untested with a real LLM key | `2a83c6f`, `c437b1b` |
+| 8 | External MCP clients (all ship disabled; tested against a fake server only) | 🟢 | `2a83c6f` |
 
 ### Test status (current working tree)
 
 | Suite | Result | How to run |
 |---|---|---|
-| Backend (`backend/tests`) | **69 passed** | see §8 |
-| MCP server (`mcp-server/tests`) | **20 passed** | `cd mcp-server && .venv/bin/pytest` |
+| Backend (`backend/tests`) | **155 passed** (needs the test Postgres, see §8) | see §8 |
+| MCP server (`mcp-server/tests`) | **24 passed** | `cd mcp-server && .venv/bin/pytest` |
 | Frontend type-check | **clean** (`tsc --noEmit`) | `cd frontend && npx tsc --noEmit` |
 
 ---
@@ -351,3 +353,20 @@ cd ../mcp-server && .venv/bin/pytest
 4. Phase 7: Missions, notifications (G2), Daily Digest and Deadline Watcher.
 5. Application tracker and deadline features (§5.2), then personal-memory RAG.
 6. Phase 8: external MCP clients (Calendar and Gmail first).
+
+---
+
+## 10. What is genuinely left (2026-11-09)
+
+**Needs an API key (blocked on this dev machine)**
+- Run the assistant, "Ask this posting", missions, coach, and discovery extraction against real Groq/Anthropic and Tavily/Brave keys.
+- Run `backend/eval/rag_eval.py` on 10-20 real postings.
+- Enable and try the external MCP servers (replace the `<...-package>` placeholders in `mcp_clients.json`).
+
+**Not built**
+- Reddit/Discord/Telegram watchers, funding-news "hidden market" scout, GitHub "good first issue" discovery.
+- Dedicated Ingestion QA agent (the content filter still passes some blog posts as hackathons).
+- Langfuse/external tracing (an `agent_runs` table exists), weekly career-standup agent, aggregate stipend insights.
+- Peer features (sharing, hackathon teams, campus feeds), autofill extension, GraphRAG, Researcher-Tailor-Writer-Reviewer pipeline.
+
+**Loose ends from section 6 not re-verified:** RemoteOK 410 sources, HTML entities in feed cards, "from 0 sources" header, `google.generativeai` deprecation, empty chat after a failed first message, demo account in the dev DB.

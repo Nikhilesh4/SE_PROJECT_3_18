@@ -6,33 +6,47 @@
 
 ## 📑 Table of Contents
 
-1. [Project Overview](#1-project-overview)
-2. [Features](#2-features)
-3. [Tech Stack](#3-tech-stack)
-4. [Architecture Overview](#4-architecture-overview)
-   - 4.1 [Layered Architecture](#41-layered-architecture)
-   - 4.2 [Event-Driven Background Workers](#42-event-driven-background-workers)
-   - 4.3 [Cache-Aside Pattern (Redis)](#43-cache-aside-pattern-redis)
-   - 4.4 [Strategy Pattern (Feed Fetching)](#44-strategy-pattern-feed-fetching)
-   - 4.5 [Facade Pattern (API Gateway)](#45-facade-pattern-api-gateway)
-5. [Project Structure](#5-project-structure)
-6. [Prerequisites](#6-prerequisites)
-7. [Setup & Installation](#7-setup--installation)
-   - 7.1 [Clone the Repository](#71-clone-the-repository)
-   - 7.2 [Start Infrastructure (Docker)](#72-start-infrastructure-docker)
-   - 7.3 [Backend Setup](#73-backend-setup)
-   - 7.4 [Frontend Setup](#74-frontend-setup)
-8. [Environment Variables](#8-environment-variables)
-9. [Running the Application](#9-running-the-application)
-10. [API Reference](#10-api-reference)
-    - 10.1 [Authentication](#101-authentication)
-    - 10.2 [Feeds](#102-feeds)
-    - 10.3 [Profile](#103-profile)
-    - 10.4 [RAG (posting text)](#104-rag-posting-text)
-11. [Design Patterns Reference](#11-design-patterns-reference)
-12. [Code Documentation Guide](#12-code-documentation-guide)
-13. [Testing](#13-testing)
-14. [Contributing](#14-contributing)
+- [🧭 UniCompass](#-unicompass)
+  - [📑 Table of Contents](#-table-of-contents)
+  - [1. Project Overview](#1-project-overview)
+  - [2. Features](#2-features)
+  - [3. Tech Stack](#3-tech-stack)
+    - [Backend](#backend)
+    - [Frontend](#frontend)
+    - [Infrastructure](#infrastructure)
+  - [4. Architecture Overview](#4-architecture-overview)
+    - [4.1 Layered Architecture](#41-layered-architecture)
+    - [4.2 Event-Driven Background Workers](#42-event-driven-background-workers)
+    - [4.3 Cache-Aside Pattern (Redis)](#43-cache-aside-pattern-redis)
+    - [4.4 Strategy Pattern (Feed Fetching)](#44-strategy-pattern-feed-fetching)
+    - [4.5 Facade Pattern (API Gateway)](#45-facade-pattern-api-gateway)
+    - [4.6 Compass Assistant (Agent)](#46-compass-assistant-agent)
+    - [4.7 RAG over posting text](#47-rag-over-posting-text)
+  - [5. Project Structure](#5-project-structure)
+  - [6. Prerequisites](#6-prerequisites)
+  - [7. Setup \& Installation](#7-setup--installation)
+    - [7.1 Clone the Repository](#71-clone-the-repository)
+    - [7.2 Start Infrastructure (Docker)](#72-start-infrastructure-docker)
+    - [7.3 Backend Setup](#73-backend-setup)
+    - [7.4 Frontend Setup](#74-frontend-setup)
+  - [8. Environment Variables](#8-environment-variables)
+  - [9. Running the Application](#9-running-the-application)
+  - [10. API Reference](#10-api-reference)
+    - [10.1 Authentication](#101-authentication)
+    - [10.2 Feeds](#102-feeds)
+    - [10.3 Profile](#103-profile)
+    - [10.4 RAG (posting text)](#104-rag-posting-text)
+  - [11. Design Patterns Reference](#11-design-patterns-reference)
+  - [12. Code Documentation Guide](#12-code-documentation-guide)
+    - [Module-level docstrings (`feeds.py` example)](#module-level-docstrings-feedspy-example)
+    - [Class docstrings (Strategy Pattern)](#class-docstrings-strategy-pattern)
+    - [Function docstrings (scoring logic)](#function-docstrings-scoring-logic)
+    - [Inline section separators](#inline-section-separators)
+  - [13. Testing](#13-testing)
+    - [Running Backend Tests](#running-backend-tests)
+    - [Running a Quick Smoke Test](#running-a-quick-smoke-test)
+    - [Cache Behaviour Verification](#cache-behaviour-verification)
+  - [14. Contributing](#14-contributing)
 
 ---
 
@@ -578,6 +592,25 @@ GET /api/feeds/rss?category=internships&skills=python,machine+learning,fastapi&l
 | `GET` | `/api/rag/compare?ids=1,2,3&aspects=pay,location` | Per-aspect passages for 2–5 postings |
 | `GET` | `/api/rag/items/{id}/resume-match` | Resume lines most relevant to the posting (auth) |
 | `POST` | `/api/rag/items/{id}/ask` | `{"question"}` → grounded answer with `citations` and `passages` (auth; one LLM call) |
+
+### 10.5 Tracker, insights, missions, notifications and coach
+
+All endpoints below are under `/api` and require auth.
+
+| Area | Endpoints |
+|---|---|
+| Applications | `GET /applications`, `PATCH /applications/{item_id}` (status, notes), `GET /deadlines`, `GET /bookmarks/calendar.ics` |
+| Search and insights | `GET /search`, `GET /insights/items/{item_id}` (signals, explanation, eligibility), `GET /insights/trends`, `GET /insights/projects`, `GET /insights/company`, `GET /insights/companies` |
+| Feedback | `POST` / `DELETE /feedback/{item_id}`, `GET /feedback` |
+| Missions | `GET` / `POST /missions`, `PATCH` / `DELETE /missions/{id}`, `POST /missions/{id}/run`, `GET /missions/{id}/matches` |
+| Notifications | `GET /notifications`, `POST /notifications/read`, `GET /notifications/stream` (SSE) |
+| Coach | `POST /outreach/draft`, `POST /research/scout`, `POST /interview/questions`, `POST /interview/feedback`, `GET /memory/search` |
+| Discovery | `POST /discovery/run`, `GET /discovery/runs`, `POST /discovery/source-scout`, `GET /discovery/source-proposals`, `POST /discovery/source-proposals/{run_id}/approve` or `/reject` |
+
+Workers run inside the API by default (`RUN_WORKERS_IN_API=true`). With Docker Compose they run in a
+separate `worker` container (`python -m app.worker_main`). Discovery needs no key for ATS, HN, Devpost
+and scholarly sources. Web search uses `TAVILY_API_KEY` or `BRAVE_API_KEY`. External MCP servers are
+configured in `backend/app/services/agent/mcp_clients.json` and all ship disabled.
 
 ---
 
