@@ -7,7 +7,7 @@ NAMES = [
     "remove_bookmark", "list_applications", "update_application", "get_notifications", "list_missions",
     "create_mission", "run_mission", "explain_opportunity", "search_with_filters", "skill_demand_trends", "pay_insights",
     "company_brief", "suggest_projects", "interview_questions", "draft_outreach", "research_scout",
-    "search_my_notes", "career_standup", "get_profile", "update_profile", "gcal__create-event",
+    "search_my_notes", "ats_check_resume", "career_standup", "get_profile", "update_profile", "gcal__create-event",
 ]
 SPECS = [ToolSpec(n, "d", {}) for n in NAMES]
 
@@ -57,3 +57,8 @@ def test_standup_questions_pull_the_standup_tool():
 def test_pay_questions_pull_pay_insights():
     assert "pay_insights" in names("how much do ML internships pay?")
     assert "pay_insights" in names("what is the typical salary for devops")
+
+
+def test_ats_requests_offer_the_ats_tool():
+    assert "ats_check_resume" in names("check the ATS score of my resume for this job")
+    assert "ats_check_resume" in names("what should I change in my resume to match this role?")

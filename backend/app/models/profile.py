@@ -23,6 +23,8 @@ class Profile(Base):
     parsed_interests = Column(ARRAY(String), default=[])
     parsed_education = Column(Text, nullable=True)
     parsed_experience = Column(Text, nullable=True)
+    parsed_name = Column(String, nullable=True)
+    parsed_socials = Column(Text, nullable=True)  # JSON list of {label, url}
     profile_embedding = (
         Column(Vector(384), nullable=True)
         if HAS_PGVECTOR

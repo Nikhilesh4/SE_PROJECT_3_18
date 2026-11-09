@@ -31,8 +31,12 @@ class ProfileRepository:
             [self._item_to_dict(item) for item in parsed_profile.experience]
         )
 
+        socials_json = json.dumps([self._item_to_dict(item) for item in parsed_profile.socials])
+
         if profile is None:
             profile = Profile(
+                parsed_name=parsed_profile.name or None,
+                parsed_socials=socials_json,
                 user_id=user_id,
                 raw_text=raw_text,
                 parsed_skills=parsed_profile.skills,
@@ -43,12 +47,36 @@ class ProfileRepository:
             db.add(profile)
         else:
             profile.raw_text = raw_text
+            profile.parsed_name = parsed_profile.name or None
+            profile.parsed_socials = socials_json
             profile.parsed_skills = parsed_profile.skills
             profile.parsed_interests = parsed_profile.interests
             profile.parsed_education = education_json
             profile.parsed_experience = experience_json
             profile.profile_embedding = None  # stale; recomputed by the service/worker
 
+        db.commit()
+        db.refresh(profile)
+        return profile
+
+    def save_manual(self, db: Session, user_id: int, data: ProfileStructured) -> Profile:
+        """Create or replace the profile fields from user-entered data, keeping any stored resume text."""
+        profile = self.get_by_user_id(db, user_id)
+        fields = dict(
+            parsed_name=data.name or None,
+            parsed_socials=json.dumps([self._item_to_dict(i) for i in data.socials]),
+            parsed_skills=data.skills,
+            parsed_interests=data.interests,
+            parsed_education=json.dumps([self._item_to_dict(i) for i in data.education]),
+            parsed_experience=json.dumps([self._item_to_dict(i) for i in data.experience]),
+            profile_embedding=None,  # stale; recomputed by the service/worker
+        )
+        if profile is None:
+            profile = Profile(user_id=user_id, raw_text="", **fields)
+            db.add(profile)
+        else:
+            for key, value in fields.items():
+                setattr(profile, key, value)
         db.commit()
         db.refresh(profile)
         return profile

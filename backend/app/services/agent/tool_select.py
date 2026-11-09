@@ -49,6 +49,10 @@ GROUPS: dict[str, tuple[str, tuple[str, ...]]] = {
         ("interview_questions", "draft_outreach", "research_scout", "search_my_notes", "suggest_projects"),
     ),
     "profile": (r"profile|resume|\bcv\b|interest|update my|change my|add .* skill", ("update_profile",)),
+    "ats": (
+        r"\bats\b|applicant tracking|resume|\bcv\b|keyword|tailor|optimi[sz]e|improve my|what.* (change|fix)|match (the|this|that) (job|role|posting)",
+        ("ats_check_resume", "match_resume_to_opportunity", "get_opportunity"),
+    ),
 }
 
 # Offered when the message matches nothing: the commonly useful lookups.

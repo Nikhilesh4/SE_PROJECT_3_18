@@ -11,7 +11,14 @@ export interface ExperienceItem {
     summary: string;
 }
 
+export interface SocialLink {
+    label: string;
+    url: string;
+}
+
 export interface ProfileData {
+    name?: string;
+    socials?: SocialLink[];
     skills: string[];
     education: EducationItem[];
     experience: ExperienceItem[];

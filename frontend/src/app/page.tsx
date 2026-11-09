@@ -36,7 +36,7 @@ export default function Home() {
           {/* Subheading */}
           <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
             UniCompass aggregates internships, hackathons, research positions, and
-            online courses from multiple sources — then matches them to your skills
+            freelance gigs from multiple sources — then matches them to your skills
             and interests using AI.
           </p>
 
@@ -82,17 +82,12 @@ export default function Home() {
         </div>
 
         {/* Feature Cards */}
-        <div className="max-w-5xl mx-auto mt-24 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="max-w-5xl mx-auto mt-24 grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
             {
               icon: "🔍",
               title: "Smart Discovery",
               desc: "Aggregates opportunities from RSS feeds, Adzuna, Jooble, and more.",
-            },
-            {
-              icon: "📚",
-              title: "Online Courses",
-              desc: "Discover free & paid MOOCs from Class Central, Coursera, edX, and freeCodeCamp.",
             },
             {
               icon: "🤖",

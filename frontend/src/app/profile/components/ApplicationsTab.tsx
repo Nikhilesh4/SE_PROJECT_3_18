@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import PageShell, { ErrorNote, Spinner } from "@/app/components/PageShell";
+import { ErrorNote, Spinner } from "@/app/components/PageShell";
 import StandupCard from "./StandupCard";
 import { errorMessage } from "@/lib/errors";
 import {
@@ -122,7 +122,7 @@ function Card({
     );
 }
 
-export default function ApplicationsPage() {
+export default function ApplicationsTab() {
     const [board, setBoard] = useState<ApplicationBoard | null>(null);
     const [deadlines, setDeadlines] = useState<DeadlineItem[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -162,11 +162,11 @@ export default function ApplicationsPage() {
     };
 
     return (
-        <PageShell
-            wide
-            title="Applications"
-            subtitle="Track every saved opportunity from first look to offer. Bookmark a posting to add it here."
-            actions={
+        <div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <p className="text-sm text-slate-600 max-w-2xl">
+                    Track every saved opportunity from first look to offer. Bookmark a posting to add it here.
+                </p>
                 <a
                     href={CALENDAR_URL}
                     download="unicompass-deadlines.ics"
@@ -174,8 +174,7 @@ export default function ApplicationsPage() {
                 >
                     📅 Export calendar (.ics)
                 </a>
-            }
-        >
+            </div>
             <ErrorNote message={error} />
 
             <StandupCard />
@@ -235,6 +234,6 @@ export default function ApplicationsPage() {
                     })}
                 </div>
             )}
-        </PageShell>
+        </div>
     );
 }

@@ -5,7 +5,7 @@ from app.db import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
 from app.rate_limit import limiter, upload_limit
-from app.schemas.profile import ProfileOut, ProfileUpdate
+from app.schemas.profile import ProfileManual, ProfileOut, ProfileUpdate
 from app.services.errors import (
     AIResponseParseError,
     AIServiceTimeoutError,
@@ -156,6 +156,19 @@ def update_my_profile(
             detail="No profile found. Upload a resume to get started.",
         )
 
+    redis_cache.delete(_profile_cache_key(current_user.id))
+    profile.from_cache = False
+    return profile
+
+
+@router.put("/me", response_model=ProfileOut)
+def save_my_profile(
+    data: ProfileManual,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create or replace the profile from details typed in by the user (no resume needed)."""
+    profile = service.save_manual_profile(db=db, user_id=current_user.id, data=data)
     redis_cache.delete(_profile_cache_key(current_user.id))
     profile.from_cache = False
     return profile

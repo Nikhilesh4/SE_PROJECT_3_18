@@ -13,7 +13,6 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; dot: string }>
     research:   { bg: "bg-sky-50",     text: "text-sky-700",     dot: "bg-sky-500"     },
     job:        { bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-500"   },
     freelance:  { bg: "bg-orange-50",  text: "text-orange-700",  dot: "bg-orange-500"  },
-    course:     { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
 };
 
 const SOURCE_ICONS: Record<string, string> = {

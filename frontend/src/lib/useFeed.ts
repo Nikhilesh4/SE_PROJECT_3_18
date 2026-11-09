@@ -65,6 +65,8 @@ interface UseFeedOptions {
     offset?: number;
     /** User skills extracted from resume — triggers relevance-based ranking */
     skills?: string[];
+    /** When false the hook stays idle (the page is showing search results instead) */
+    enabled?: boolean;
 }
 
 const CACHE_KEY = "unicompass_feed_cache";
@@ -121,6 +123,7 @@ export function useFeed({
     limitPerFeed = 50,
     offset = 0,
     skills,
+    enabled = true,
 }: UseFeedOptions = {}) {
     const cat = category ?? "";
     const sk = skillsKey(skills);
@@ -138,6 +141,7 @@ export function useFeed({
     }, [cat, offset, sk]);
 
     const fetch_ = useCallback(async () => {
+        if (!enabled) return;
         setLoading(true);
         setError(null);
         try {
@@ -159,7 +163,7 @@ export function useFeed({
         } finally {
             setLoading(false);
         }
-    }, [category, limitPerFeed, cat, offset, sk]);
+    }, [enabled, category, limitPerFeed, cat, offset, sk]);
 
     useEffect(() => {
         fetch_();

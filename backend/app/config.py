@@ -128,6 +128,17 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT: str = "10/minute"
     REGISTER_RATE_LIMIT: str = "10/hour"
     UPLOAD_RATE_LIMIT: str = "10/hour"
+    OTP_RATE_LIMIT: str = "10/hour"
+
+    # Email verification at signup. Without SMTP_HOST the code is only written to the server log.
+    REQUIRE_EMAIL_VERIFICATION: bool = os.getenv("REQUIRE_EMAIL_VERIFICATION", "true").lower() != "false"
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "")
+    SMTP_STARTTLS: bool = os.getenv("SMTP_STARTTLS", "true").lower() != "false"
+    SMTP_SSL: bool = os.getenv("SMTP_SSL", "false").lower() == "true"
 
     # Run the background workers inside the API process (convenient for a
     # one-command dev start). In production set this to false and run

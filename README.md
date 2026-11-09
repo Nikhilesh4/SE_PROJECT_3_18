@@ -1,6 +1,8 @@
 # 🧭 UniCompass
 
-> **AI-powered opportunity discovery platform** — Internships, Jobs, Hackathons, and Research opportunities aggregated, ranked by your skill profile, and served in milliseconds via Redis caching.
+> **AI-powered, agentic opportunity discovery platform** — internships, jobs, hackathons, research and open-source programs gathered from RSS, job APIs, ATS boards and discovery agents, ranked semantically against your resume, and backed by an AI assistant, RAG over posting text, an MCP server, an application tracker and live alerts.
+
+> **Status and future plans:** see [`docs/AGENTIC_ROADMAP.md`](docs/AGENTIC_ROADMAP.md).
 
 ---
 
@@ -54,7 +56,9 @@
 
 **UniCompass** is a full-stack web application that helps university students discover curated opportunities — internships, jobs, hackathons, and research positions — all in one place.
 
-The system continuously ingests RSS/Atom feeds in the background, normalises them into a unified schema, and stores them in PostgreSQL. When a user provides their skill profile (extracted from an uploaded resume), the feed is re-ranked using a relevance scoring algorithm that weights tag matches, title matches, and description mentions — ensuring the most personally relevant opportunities always surface first.
+Background workers ingest RSS/Atom feeds, job APIs (Adzuna, Jooble) and discovery channels (Greenhouse/Lever/Ashby/Workable/SmartRecruiters boards, HN "Who's Hiring", Devpost, arXiv/Semantic Scholar, GSoC/Outreachy/LFX/MLH), normalise them into one schema, clean out junk with versioned QA rules, and store them in PostgreSQL with pgvector embeddings. When a user uploads a resume, an LLM extracts their skills and the feed is ranked by a hybrid of semantic similarity and keyword matches, adjusted by their feedback.
+
+On top of that, students get a streaming AI assistant, cited answers about any posting (RAG), saved-search Missions with live notifications, a Kanban application tracker, a weekly career standup, and insights on skill demand and pay. Everything is also available to Claude Desktop, Claude Code or Cursor through a 30-tool MCP server.
 
 Redis is used as a read-through cache (Cache-Aside Pattern) with a 5-minute TTL, so repeated requests to the same endpoint are served in < 5 ms without touching the database.
 
@@ -65,15 +69,23 @@ Redis is used as a read-through cache (Cache-Aside Pattern) with a 5-minute TTL,
 | Feature | Description |
 |---|---|
 | 🔐 **Authentication** | JWT-based login/register with bcrypt password hashing |
-| 📄 **Resume Parsing** | Upload a PDF resume; Google Generative AI extracts skills automatically |
+| 📄 **Resume Parsing** | Upload a PDF resume; an LLM (Groq by default, Gemini optional) extracts skills automatically |
 | 🔍 **Semantic Skill Matching** | Feed items are ranked by meaning, not just keywords: pgvector cosine similarity on `all-MiniLM-L6-v2` embeddings, blended with keyword matches ("machine learning" finds a "neural networks" posting) |
 | ⚡ **Redis Caching** | Cache-Aside with per-user skill-hash keys; cold-start < 200 ms, warm < 5 ms |
-| 🔄 **Background Ingestion** | Two asyncio workers continuously refresh and invalidate RSS data |
+| 🔄 **Background Workers** | RSS refresh, ingestion, embedding/RAG indexing, discovery and activity workers; run inside the API in dev or in a separate `worker` container with Docker Compose |
 | 📊 **Cache Observability** | Every API response includes a `from_cache` flag for transparency |
-| 🗂️ **Category Filtering** | Filter by `internships`, `jobs`, `hackathons`, `research` |
+| 🗂️ **Search and Filters** | Server-side full-text search (websearch syntax) with category, source, remote, minimum stipend and closing-soon filters |
 | 📚 **Posting Q&A (RAG)** | Ask a posting "is it paid?" or "who can apply?" and get an answer that cites the passages it comes from, or says the posting doesn't state it. Also cross-posting fact search, side-by-side comparison, and resume-to-posting matching (via the assistant and MCP) |
 | 💬 **Compass Assistant** | In-app AI chat at `/assistant` that searches, explains and bookmarks opportunities and checks deadlines, using the same tools as the MCP server. Runs on Groq (default) or Claude |
-| 🤖 **MCP Server** | Use UniCompass from Claude Desktop / Claude Code / Cursor: semantic search, bookmarks, deadlines, profile edits, plus skill-gap and cover-letter prompts. See [`mcp-server/README.md`](mcp-server/README.md) |
+| 🤖 **MCP Server** | Use UniCompass from Claude Desktop / Claude Code / Cursor: 30 tools (search, RAG, ATS resume check, bookmarks, applications, missions, insights, coach, standup, pay insights), 2 resources and 3 prompts. See [`mcp-server/README.md`](mcp-server/README.md) |
+| 🛰️ **Discovery Agents** | ATS boards, HN "Who's Hiring" (LLM extraction), Devpost, scholarly sources, open-source programs, web search (Tavily/Brave) and a Source Scout that proposes new feeds for admin approval |
+| 🧹 **Ingestion QA** | Versioned, explainable rules hide error pages, podcasts, listicles, news and recaps from every discovery surface; each rejection is flagged and reversible |
+| 🎯 **Missions and Alerts** | Saved natural-language searches run on a schedule; new matches arrive in a navbar bell over Server-Sent Events, plus a weekly digest |
+| 📋 **Application Tracker** | Kanban board (saved → applied → interview → offer/rejected) with notes, deadline view and `.ics` calendar export |
+| 🗓️ **Career Standup** | Up to three ranked actions for the week (deadlines, interviews, stale applications, missing skills) in the Applications tab of your profile, via the API and the assistant |
+| 📈 **Insights** | Explainable ranking, scam/eligibility/remote signals, skill-demand trends, company briefs, project suggestions, and pay insights (medians and ranges by category with sample sizes) |
+| 🧑‍🏫 **Coach** | Outreach drafts, research-lab scout, mock interview questions with feedback, and memory search over your own notes |
+| 🔐 **Security** | httpOnly cookie session via Next.js proxy routes, secret-key validation at startup, rate limits on login, register and resume upload |
 
 ---
 
@@ -87,14 +99,17 @@ Redis is used as a read-through cache (Cache-Aside Pattern) with a 5-minute TTL,
 | Cache | [Redis 7](https://redis.io/) |
 | ORM | [SQLAlchemy](https://www.sqlalchemy.org/) |
 | Auth | JWT via `python-jose`, passwords via `passlib[bcrypt]` |
-| AI / NLP | [Google Generative AI](https://ai.google.dev/) (Gemini) |
+| LLMs | Groq (`openai/gpt-oss-120b`, default) or Anthropic Claude for the assistant and RAG; Gemini optional for resume parsing |
+| Embeddings | `all-MiniLM-L6-v2` via [fastembed](https://github.com/qdrant/fastembed) (ONNX), stored in pgvector |
+| Agents / MCP | [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) (server and client), custom tool-calling loop |
+| Migrations | [Alembic](https://alembic.sqlalchemy.org/) |
 | RSS Parsing | [feedparser](https://feedparser.readthedocs.io/) |
 | PDF Parsing | [PyMuPDF](https://pymupdf.readthedocs.io/) |
 
 ### Frontend
 | Layer | Technology |
 |---|---|
-| Framework | [Next.js 14](https://nextjs.org/) (App Router) |
+| Framework | [Next.js 16](https://nextjs.org/) (App Router) |
 | Language | TypeScript |
 | Styling | CSS Modules / Vanilla CSS |
 | HTTP Client | Fetch API (Next.js API Routes as Facade/Gateway) |
@@ -135,10 +150,13 @@ The system is structured in strict layers; each layer only communicates with the
 
 ### 4.2 Event-Driven Background Workers
 
-Two background `asyncio` tasks run continuously inside the FastAPI lifespan:
+Background `asyncio` workers (`backend/app/workers/`) run inside the FastAPI lifespan by default (`RUN_WORKERS_IN_API=true`), or in a separate `worker` container (`python -m app.worker_main`) under Docker Compose:
 
-- **`rss_refresh_loop`** — Fetches all RSS sources every N minutes and upserts into the `rss_items` table.
-- **`ingestion_loop`** — After each ingestion batch, invalidates all `feed:*` keys in Redis, ensuring users never see stale data after a refresh.
+- **`rss_refresh_worker`** — Fetches all RSS sources every N minutes and upserts into the `rss_items` table.
+- **`ingestion_worker`** — After each ingestion batch, invalidates all `feed:*` keys in Redis, ensuring users never see stale data after a refresh.
+- **`embedding_worker`** — Embeds new or changed postings and (re)builds their RAG passages; backfills older rows.
+- **`discovery_worker`** — Runs the discovery pipeline (ATS, HN, Devpost, scholarly, programs, web search): extract → verify → enrich → upsert.
+- **`activity_worker`** — Runs Ingestion QA first, then Missions, new-match alerts and the weekly digest.
 
 ```
 RSS Sources ──► rss_refresh_loop ──► PostgreSQL
@@ -289,19 +307,36 @@ SE_PROJECT_3_18/
 │   │   ├── routers/
 │   │   │   ├── auth.py              # /auth/register, /auth/login, /auth/me
 │   │   │   ├── feeds.py             # /api/feeds/rss  (Strategy + Cache-Aside)
-│   │   │   └── profile.py           # /profile/upload-resume, /profile/me
+│   │   │   ├── profile.py           # /profile/upload-resume, /profile/me
+│   │   │   ├── agent.py             # /agent/chat (SSE), conversations
+│   │   │   ├── rag.py               # /api/rag/* posting search, ask, compare
+│   │   │   ├── applications.py      # tracker, deadlines, .ics, standup
+│   │   │   ├── insights.py          # search, signals, trends, companies, stipends
+│   │   │   ├── missions.py          # saved searches and matches
+│   │   │   ├── notifications.py     # list, mark read, SSE stream
+│   │   │   └── coach.py             # outreach, interview, research scout, discovery admin
 │   │   ├── services/
 │   │   │   ├── redis_cache.py       # Redis client wrapper (get/set/delete)
+│   │   │   ├── agent/               # Compass Assistant loop, providers, toolbox, MCP clients
+│   │   │   ├── rag/                 # chunking, indexing, hybrid retrieval, cited answers
+│   │   │   ├── discovery/           # ATS, HN, Devpost, scholarly, programs, web search, QA rules
+│   │   │   ├── insights/            # signals, explanations, .ics export
+│   │   │   ├── matching/            # embeddings and hybrid ranking
 │   │   │   └── rss/
 │   │   │       ├── cache_service.py # Feed-level cache orchestration
 │   │   │       └── feed_sources.py  # FEED_SOURCES list (all RSS URLs + categories)
 │   │   ├── workers/
 │   │   │   ├── rss_refresh_worker.py   # Background RSS ingestion loop
-│   │   │   └── ingestion_worker.py     # Redis invalidation after ingestion
+│   │   │   ├── ingestion_worker.py     # Redis invalidation after ingestion
+│   │   │   ├── embedding_worker.py     # Embeddings + RAG passages
+│   │   │   ├── discovery_worker.py     # Discovery pipeline
+│   │   │   └── activity_worker.py      # QA, missions, alerts, digest
 │   │   ├── middleware/              # Custom FastAPI middleware
 │   │   └── utils/                   # Shared helpers (e.g., JWT, hashing)
+│   ├── alembic/                     # database migrations (0001–0006)
+│   ├── eval/                        # RAG evaluation harness
 │   ├── requirements.txt
-│   └── tests/                       # pytest test suites
+│   └── tests/                       # pytest suites (198 tests)
 │
 ├── frontend/
 │   ├── src/
@@ -310,9 +345,10 @@ SE_PROJECT_3_18/
 │   ├── package.json
 │   └── next.config.ts
 │
-├── mcp-server/                      # MCP server for AI assistants (see mcp-server/README.md)
+├── mcp-server/                      # MCP server for AI assistants, 26 tests (see mcp-server/README.md)
+├── docs/                            # architecture docs, ADRs, AGENTIC_ROADMAP.md
 │
-├── docker-compose.yml               # PostgreSQL + Redis + RSS-Bridge
+├── docker-compose.yml               # PostgreSQL + Redis + RSS-Bridge; `app` profile adds api + worker
 ├── .gitignore
 └── README.md
 ```
@@ -447,8 +483,9 @@ SECRET_KEY=
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-# ── Google Generative AI (Gemini) ─────────────────────────
-GOOGLE_API_KEY=your-google-ai-api-key
+# ── Resume parsing (Groq by default; Gemini optional) ────
+PROFILE_AI_PROVIDER=groq            # or "gemini"
+GEMINI_API_KEY=your-gemini-key      # only needed for gemini
 
 # ── Compass Assistant ────────────────────────────────────
 AGENT_PROVIDER=groq                 # or "anthropic"
@@ -465,6 +502,18 @@ RATE_LIMIT_STORAGE_URI=memory://    # use your REDIS_URL when running several AP
 LOGIN_RATE_LIMIT=10/minute          # per client IP
 REGISTER_RATE_LIMIT=10/hour         # per client IP
 UPLOAD_RATE_LIMIT=10/hour           # per user (resume upload calls an LLM)
+OTP_RATE_LIMIT=10/hour              # per client IP (signup email codes)
+
+# ── Signup email verification (optional; defaults shown) ─
+# Signup asks for a 6-digit code sent to the user's email. Without SMTP_HOST the
+# code is only printed in the backend log (fine for local development).
+REQUIRE_EMAIL_VERIFICATION=true
+SMTP_HOST=                          # e.g. smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=                      # for Gmail use an app password
+SMTP_FROM=                          # defaults to SMTP_USER
+SMTP_STARTTLS=true                  # set SMTP_SSL=true instead for port 465
 
 # ── Semantic matching (optional; defaults shown) ─────────
 EMBEDDINGS_ENABLED=true
@@ -602,8 +651,8 @@ All endpoints below are under `/api` and require auth.
 
 | Area | Endpoints |
 |---|---|
-| Applications | `GET /applications`, `PATCH /applications/{item_id}` (status, notes), `GET /deadlines`, `GET /bookmarks/calendar.ics` |
-| Search and insights | `GET /search`, `GET /insights/items/{item_id}` (signals, explanation, eligibility), `GET /insights/trends`, `GET /insights/projects`, `GET /insights/company`, `GET /insights/companies` |
+| Applications | `GET /applications`, `PATCH /applications/{item_id}` (status, notes), `GET /deadlines`, `GET /bookmarks/calendar.ics`, `GET /standup` (`?polish=true` lets the LLM reword the summary) |
+| Search and insights | `GET /search`, `GET /insights/items/{item_id}` (signals, explanation, eligibility), `GET /insights/trends`, `GET /insights/projects`, `GET /insights/company`, `GET /insights/companies`, `GET /insights/stipends` |
 | Feedback | `POST` / `DELETE /feedback/{item_id}`, `GET /feedback` |
 | Missions | `GET` / `POST /missions`, `PATCH` / `DELETE /missions/{id}`, `POST /missions/{id}/run`, `GET /missions/{id}/matches` |
 | Notifications | `GET /notifications`, `POST /notifications/read`, `GET /notifications/stream` (SSE) |
@@ -744,7 +793,9 @@ curl http://localhost:8000/health
 
 3. **Test your changes** before submitting a PR:
    ```bash
-   pytest tests/ -v
+   cd backend && pytest -v                 # 198 tests, needs the test Postgres
+   cd ../mcp-server && .venv/bin/pytest    # 26 tests
+   cd ../frontend && npx tsc --noEmit && npx eslint
    ```
 
 4. **Open a Pull Request** against `main` with a clear description of what changed and why.

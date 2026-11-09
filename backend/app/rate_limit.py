@@ -57,5 +57,9 @@ def register_limit() -> str:
     return settings.REGISTER_RATE_LIMIT
 
 
+def otp_limit() -> str:
+    return settings.OTP_RATE_LIMIT
+
+
 def upload_limit() -> str:
     return settings.UPLOAD_RATE_LIMIT

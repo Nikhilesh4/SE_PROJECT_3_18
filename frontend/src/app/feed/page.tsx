@@ -1,8 +1,10 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFeed } from "@/lib/useFeed";
+import { errorMessage } from "@/lib/errors";
+import { searchOpportunities, type SearchResponse } from "@/lib/insights";
 import { useAuth } from "@/lib/useAuth";
 import { useProfile } from "@/lib/useProfile";
 import { useBookmarks } from "@/lib/useBookmarks";
@@ -16,10 +18,15 @@ const ALL_CATEGORIES = [
     { value: "hackathon", label: "Hackathon", icon: "⚡" },
     { value: "research", label: "Research", icon: "🔬" },
     { value: "freelance", label: "Freelance", icon: "🌐" },
-    { value: "course", label: "Course", icon: "📚" },
 ];
 
 const ITEMS_PER_PAGE = 50;
+const CLOSING_OPTIONS = [
+    { value: "", label: "Any time" },
+    { value: "3", label: "Within 3 days" },
+    { value: "7", label: "Within a week" },
+    { value: "30", label: "Within a month" },
+];
 
 function SkeletonCard() {
     return (
@@ -62,6 +69,19 @@ function FeedPageInner() {
     const [page, setPage] = useState(1);
     const [relevanceMode, setRelevanceMode] = useState(defaultSort);
 
+    // Search state. Typing runs server-side full-text search (quotes, OR, -word);
+    // with no text and no filters the page is the ranked/paginated feed.
+    const [debouncedQ, setDebouncedQ] = useState("");
+    const [source, setSource] = useState("");
+    const [remote, setRemote] = useState(false);
+    const [minStipend, setMinStipend] = useState("");
+    const [closing, setClosing] = useState("");
+    const [retryTick, setRetryTick] = useState(0);
+    const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
+    const searchActive = Boolean(debouncedQ.trim() || source || remote || minStipend || closing);
+
     // Bookmark state
     const { isBookmarked, toggleBookmark } = useBookmarks();
 
@@ -81,29 +101,75 @@ function FeedPageInner() {
         // When relevanceMode is on, backend fetches ALL items, scores them,
         // and returns globally-ranked results paginated server-side.
         skills: userSkills.length > 0 ? userSkills : undefined,
+        enabled: !searchActive,
     });
 
-    // Client-side search filter — applied on top of ranked results.
-    // Note: in relevance mode the ranking is global (all DB items scored),
-    // so search here filters within the current ranked page.
-    const filtered = useMemo(() => {
-        if (!data) return [];
-        const q = search.trim().toLowerCase();
-        if (!q) return data.items;
-        return data.items.filter(
-            (item) =>
-                item.title.toLowerCase().includes(q) ||
-                item.summary.toLowerCase().includes(q) ||
-                item.source_name.toLowerCase().includes(q) ||
-                item.tags.some((t) => t.toLowerCase().includes(q))
-        );
-    }, [data, search]);
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setDebouncedQ(search);
+            setPage(1);
+        }, 350);
+        return () => clearTimeout(t);
+    }, [search]);
 
-    const totalPages = data ? Math.max(1, Math.ceil(data.total_items / ITEMS_PER_PAGE)) : 1;
+    useEffect(() => {
+        if (!searchActive) return;
+        let cancelled = false;
+        const t = setTimeout(async () => {
+            setSearchLoading(true);
+            setSearchError(null);
+            try {
+                const res = await searchOpportunities({
+                    q: debouncedQ.trim(),
+                    category: selectedCategory,
+                    source,
+                    remote,
+                    min_stipend: minStipend ? Number(minStipend) : undefined,
+                    closing_within_days: closing ? Number(closing) : undefined,
+                    limit: ITEMS_PER_PAGE,
+                    offset,
+                });
+                if (!cancelled) setSearchResult(res);
+            } catch (err) {
+                if (!cancelled) setSearchError(errorMessage(err, "Search failed. Please try again."));
+            } finally {
+                if (!cancelled) setSearchLoading(false);
+            }
+        }, 0);
+        return () => {
+            cancelled = true;
+            clearTimeout(t);
+        };
+    }, [searchActive, debouncedQ, selectedCategory, source, remote, minStipend, closing, offset, retryTick]);
+
+    const filtered = useMemo(
+        () => (searchActive ? searchResult?.items : data?.items) ?? [],
+        [searchActive, searchResult, data]
+    );
+    const totalItems = searchActive ? (searchResult?.total ?? 0) : (data?.total_items ?? 0);
+    const hasData = searchActive ? searchResult !== null : data !== null;
+    const viewLoading = searchActive ? searchLoading || (!searchResult && !searchError) : loading;
+    const viewError = searchActive ? searchError : error;
+    const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+    const retry = searchActive ? () => setRetryTick((n) => n + 1) : refetch;
+
+    const resetFilters = () => {
+        setSelectedCategory("");
+        setSearch("");
+        setDebouncedQ("");
+        setSource("");
+        setRemote(false);
+        setMinStipend("");
+        setClosing("");
+        setPage(1);
+    };
+    const onFilter = <T,>(set: (v: T) => void) => (v: T) => {
+        set(v);
+        setPage(1);
+    };
 
     const handleCategoryChange = (value: string) => {
         setSelectedCategory(value);
-        setSearch("");
         setPage(1);
     };
 
@@ -112,6 +178,7 @@ function FeedPageInner() {
         setRelevanceMode((v) => !v);
         setPage(1);   // always reset to page 1 when switching modes
         setSearch(""); // clear search so ranking is immediately visible
+        setDebouncedQ("");
     };
 
     // Auth guard
@@ -170,7 +237,7 @@ function FeedPageInner() {
                         )}
 
                         {/* Relevance mode badge */}
-                        {relevanceMode && hasProfile && (
+                        {relevanceMode && hasProfile && !searchActive && (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border bg-violet-50 border-violet-300 text-violet-700 text-xs font-semibold">
                                 🎯 Ranked by your skills
                             </div>
@@ -183,7 +250,9 @@ function FeedPageInner() {
                                 Discovery Feed
                             </h1>
                             <p className="mt-1 text-slate-600 text-sm">
-                                {data
+                                {searchActive && searchResult
+                                    ? `${searchResult.total.toLocaleString()} result${searchResult.total === 1 ? "" : "s"} · quotes for exact phrases, OR for alternatives, -word to exclude`
+                                    : data
                                     ? `${data.total_items.toLocaleString()} opportunities${data.sources.length > 0 ? ` from ${data.sources.length} sources` : ""} · refreshed ${new Date(data.fetched_at).toLocaleTimeString()}`
                                     : "Fetching live opportunities…"}
                             </p>
@@ -194,8 +263,8 @@ function FeedPageInner() {
                             <button
                                 id="relevance-toggle"
                                 onClick={handleRelevanceToggle}
-                                disabled={!hasProfile || profileLoading}
-                                title={relevanceBtnTitle}
+                                disabled={!hasProfile || profileLoading || searchActive}
+                                title={searchActive ? "Clear the search and filters to rank by your skills" : relevanceBtnTitle}
                                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                                     relevanceMode
                                         ? "bg-violet-600 text-white border-violet-600 shadow-md shadow-violet-200"
@@ -278,12 +347,14 @@ function FeedPageInner() {
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search by title, source, or tags…"
+                        placeholder='Search every posting — e.g. "machine learning" intern -senior'
+                        aria-label="Search opportunities"
                         className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
                     />
                     {search && (
                         <button
-                            onClick={() => setSearch("")}
+                            onClick={() => { setSearch(""); setDebouncedQ(""); }}
+                            aria-label="Clear search"
                             className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -320,6 +391,42 @@ function FeedPageInner() {
                             })}
                         </div>
 
+                        {/* Search filters */}
+                        <div className="rounded-xl border border-slate-200 bg-white p-3 flex flex-col gap-3">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2">Filters</p>
+                            <label className="block text-xs font-medium text-slate-600 px-1">
+                                Source
+                                <select value={source} onChange={(e) => onFilter(setSource)(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                                    <option value="">All sources</option>
+                                    {Object.entries(searchResult?.facets.sources ?? {}).map(([s, n]) => (
+                                        <option key={s} value={s}>{s} ({n})</option>
+                                    ))}
+                                    {source && !(source in (searchResult?.facets.sources ?? {})) && <option value={source}>{source}</option>}
+                                </select>
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700 px-1">
+                                <input type="checkbox" checked={remote} onChange={(e) => onFilter(setRemote)(e.target.checked)} className="rounded border-slate-300 text-indigo-600" />
+                                Remote only
+                            </label>
+                            <label className="block text-xs font-medium text-slate-600 px-1">
+                                Minimum stipend (₹/month)
+                                <input type="number" min={0} step={5000} value={minStipend} onChange={(e) => onFilter(setMinStipend)(e.target.value)} placeholder="e.g. 20000" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </label>
+                            <label className="block text-xs font-medium text-slate-600 px-1">
+                                Deadline
+                                <select value={closing} onChange={(e) => onFilter(setClosing)(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                                    {CLOSING_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            {searchActive && (
+                                <button onClick={resetFilters} className="text-xs text-indigo-600 hover:underline text-left px-1 cursor-pointer">
+                                    Reset search &amp; filters
+                                </button>
+                            )}
+                        </div>
+
                         {/* Profile snippet in sidebar */}
                         {hasProfile && profile && (
                             <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
@@ -346,15 +453,15 @@ function FeedPageInner() {
                     {/* ── Main content ── */}
                     <main className="flex-1 min-w-0">
                         {/* Error state */}
-                        {error && !loading && (
+                        {viewError && !viewLoading && (
                             <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
                                 <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-2xl">🚫</div>
                                 <div>
                                     <p className="text-slate-900 font-semibold">Failed to load feed</p>
-                                    <p className="text-slate-600 text-sm mt-1">{error}</p>
+                                    <p className="text-slate-600 text-sm mt-1">{viewError}</p>
                                 </div>
                                 <button
-                                    onClick={refetch}
+                                    onClick={retry}
                                     className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
                                 >
                                     Try again
@@ -363,7 +470,7 @@ function FeedPageInner() {
                         )}
 
                         {/* Loading skeletons */}
-                        {loading && (
+                        {viewLoading && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                                 {Array.from({ length: 9 }).map((_, i) => (
                                     <SkeletonCard key={i} />
@@ -372,17 +479,17 @@ function FeedPageInner() {
                         )}
 
                         {/* Results */}
-                        {!loading && !error && (
+                        {!viewLoading && !viewError && (
                             <>
                                 {/* Results count */}
-                                {data && (
+                                {hasData && (
                                     <p className="text-xs text-slate-500 mb-4">
-                                        {relevanceMode ? (
+                                        {relevanceMode && !searchActive ? (
                                             <>
                                                 🎯 Showing{" "}
                                                 <span className="text-slate-800 font-medium">{filtered.length}</span>
                                                 {" "}of{" "}
-                                                <span className="text-violet-700 font-medium">{data.total_items.toLocaleString()} total items</span>
+                                                <span className="text-violet-700 font-medium">{totalItems.toLocaleString()} total items</span>
                                                 {" "}— globally ranked by your skills
                                                 {selectedCategory && <> · <span className="text-indigo-700">{selectedCategory}</span></>}
                                                 {totalPages > 1 && <> · Page <span className="text-slate-800 font-medium">{page}</span> of {totalPages}</>}
@@ -390,12 +497,12 @@ function FeedPageInner() {
                                         ) : (
                                             <>
                                                 Showing <span className="text-slate-800 font-medium">{filtered.length}</span>
-                                                {data.total_items !== filtered.length && (
-                                                    <> of {data.total_items.toLocaleString()}</>
+                                                {totalItems !== filtered.length && (
+                                                    <> of {totalItems.toLocaleString()}</>
                                                 )}{" "}
                                                 results
                                                 {selectedCategory && <> · <span className="text-indigo-700">{selectedCategory}</span></>}
-                                                {search && <> matching <span className="text-indigo-700">&ldquo;{search}&rdquo;</span></>}
+                                                {debouncedQ.trim() && <> matching <span className="text-indigo-700">&ldquo;{debouncedQ.trim()}&rdquo;</span></>}
                                                 {totalPages > 1 && <> · Page <span className="text-slate-800 font-medium">{page}</span> of {totalPages}</>}
                                             </>
                                         )}
@@ -409,7 +516,7 @@ function FeedPageInner() {
                                             <OpportunityCard
                                                 key={item.guid ?? item.url ?? idx}
                                                 item={item}
-                                                highlightSkills={relevanceMode ? userSkills : []}
+                                                highlightSkills={relevanceMode && !searchActive ? userSkills : []}
                                                 isBookmarked={item.id != null ? isBookmarked(item.id) : false}
                                                 onToggleBookmark={toggleBookmark}
                                             />
@@ -421,13 +528,13 @@ function FeedPageInner() {
                                         <div>
                                             <p className="text-slate-900 font-semibold text-lg">No results found</p>
                                             <p className="text-slate-600 text-sm mt-1">
-                                                {search
-                                                    ? `No opportunities match "${search}"`
+                                                {searchActive
+                                                    ? "No postings match. Try fewer filters or different words."
                                                     : `No ${selectedCategory || "opportunity"} listings available right now.`}
                                             </p>
                                         </div>
                                         <button
-                                            onClick={() => { setSelectedCategory(""); setSearch(""); setPage(1); }}
+                                            onClick={resetFilters}
                                             className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 transition-colors"
                                         >
                                             Clear filters

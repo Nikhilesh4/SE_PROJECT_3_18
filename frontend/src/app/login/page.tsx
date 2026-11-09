@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AuthRequestError, login } from "@/lib/authSession";
 import { clearProfileCache } from "@/lib/useProfile";
+import { useScrubCredentialsFromUrl } from "@/lib/useScrubCredentialsFromUrl";
 
 function LoginForm() {
     const router = useRouter();
@@ -14,6 +15,10 @@ function LoginForm() {
     const [formData, setFormData] = useState({ email: "", password: "" });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    // Until the page is interactive, a submit would be a native form post; keep the button off.
+    const [ready, setReady] = useState(false);
+    useEffect(() => setReady(true), []);
+    useScrubCredentialsFromUrl();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -78,7 +83,7 @@ function LoginForm() {
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form method="post" action="/login" onSubmit={handleSubmit} className="space-y-5">
                         <div>
                             <label
                                 htmlFor="email"
@@ -91,6 +96,7 @@ function LoginForm() {
                                 name="email"
                                 type="email"
                                 required
+                                autoComplete="email"
                                 value={formData.email}
                                 onChange={handleChange}
                                 className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
@@ -110,6 +116,7 @@ function LoginForm() {
                                 name="password"
                                 type="password"
                                 required
+                                autoComplete="current-password"
                                 value={formData.password}
                                 onChange={handleChange}
                                 className="w-full px-4 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"
@@ -119,7 +126,7 @@ function LoginForm() {
 
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || !ready}
                             className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             {loading ? (

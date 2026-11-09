@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import PageShell, { ErrorNote, Spinner } from "@/app/components/PageShell";
+import { ErrorNote, Spinner } from "@/app/components/PageShell";
 import { errorMessage } from "@/lib/errors";
 import {
     createMission,
@@ -146,7 +146,7 @@ function MissionCard({ mission, onChanged }: { mission: Mission; onChanged: () =
     );
 }
 
-export default function MissionsPage() {
+export default function MissionsTab() {
     const [missions, setMissions] = useState<Mission[] | null>(null);
     const [name, setName] = useState("");
     const [query, setQuery] = useState("");
@@ -184,10 +184,8 @@ export default function MissionsPage() {
     };
 
     return (
-        <PageShell
-            title="Missions"
-            subtitle="Describe what you want once. UniCompass re-checks daily and tells you only about new, verified matches."
-        >
+        <div>
+            <p className="text-sm text-slate-600 max-w-2xl mb-4">Describe what you want once. UniCompass re-checks daily and tells you only about new, verified matches.</p>
             <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-3 mb-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <label className="block">
@@ -237,6 +235,6 @@ export default function MissionsPage() {
                     ))}
                 </ul>
             )}
-        </PageShell>
+        </div>
     );
 }

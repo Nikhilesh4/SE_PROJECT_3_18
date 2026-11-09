@@ -1,0 +1,59 @@
+# Render Blueprint for the UniCompass backend: API (+ background workers), Postgres and Redis.
+# The Next.js frontend is deployed separately on Vercel — see docs/DEPLOYMENT.md.
+#
+# Secrets use `sync: false`: Render asks for them in the dashboard on first deploy, so none live in git.
+
+services:
+  - type: web
+    name: unicompass-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .            # repo root: the image also needs ./mcp-server
+    plan: starter               # always-on; the free plan sleeps, which would stop the workers
+    healthCheckPath: /health
+    # --proxy-headers makes rate limits use the visitor's IP (forwarded by the Next.js proxy)
+    # instead of one shared proxy IP.
+    dockerCommand: sh -c "uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: {name: unicompass-db, property: connectionString}
+      - key: REDIS_URL
+        fromService: {type: keyvalue, name: unicompass-redis, property: connectionString}
+      - key: RATE_LIMIT_STORAGE_URI
+        fromService: {type: keyvalue, name: unicompass-redis, property: connectionString}
+      - key: SECRET_KEY
+        generateValue: true     # JWT signing key; changing it signs everyone out
+      - key: RUN_WORKERS_IN_API   # feed refresh, ingestion, embeddings, missions run inside this one service
+        value: "true"
+      - key: RUN_MIGRATIONS_ON_STARTUP
+        value: "true"
+      - key: AGENT_PROVIDER
+        value: groq
+      # ── Set these in the Render dashboard (never commit them) ──
+      - {key: GROQ_API_KEY, sync: false}
+      - {key: ADMIN_EMAILS, sync: false}      # comma-separated emails that get admin access
+      - {key: SMTP_HOST, sync: false}
+      - {key: SMTP_PORT, sync: false}
+      - {key: SMTP_USER, sync: false}
+      - {key: SMTP_PASSWORD, sync: false}
+      - {key: SMTP_FROM, sync: false}
+      - {key: SMTP_STARTTLS, sync: false}
+      # Optional discovery / job-source keys; leave blank to skip those sources.
+      - {key: ADZUNA_APP_ID, sync: false}
+      - {key: ADZUNA_APP_KEY, sync: false}
+      - {key: JOOBLE_API_KEY, sync: false}
+      - {key: TAVILY_API_KEY, sync: false}
+      - {key: BRAVE_API_KEY, sync: false}
+
+  - type: keyvalue            # Redis: response cache, rate limits, live notifications
+    name: unicompass-redis
+    plan: free
+    ipAllowList: []           # reachable only from your other Render services
+
+databases:
+  - name: unicompass-db
+    databaseName: unicompass
+    user: unicompass
+    plan: basic-256mb         # the free Postgres plan is deleted after 30 days
+    postgresMajorVersion: "16"
+    ipAllowList: []           # private access only; the API connects over Render's internal network

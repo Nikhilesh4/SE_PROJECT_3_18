@@ -176,6 +176,10 @@ class UniCompassAPI:
             "GET", f"/api/rag/items/{item_id}/resume-match", params={"limit": limit}
         )
 
+    async def ats_check(self, item_id: int | None = None) -> dict:
+        params = {"item_id": item_id} if item_id is not None else None
+        return await self._request("GET", "/api/insights/ats", params=params)
+
     # ── Tracker, notifications, missions, insights, coaching ─────────
 
     async def applications(self) -> dict:

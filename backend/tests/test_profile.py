@@ -44,3 +44,27 @@ def test_profile_update_schema_limits():
     with pytest.raises(ValueError):
         ProfileUpdate(skills=["x"] * 101)
     assert ProfileUpdate(skills=["a" * 100]).skills == ["a" * 60]
+
+
+def test_manual_profile_is_created_without_a_resume(client, auth_headers):
+    body = {
+        "name": "  Asha   Rao ",
+        "skills": ["Python", "python", " Go "],
+        "interests": ["ML"],
+        "education": [{"degree": "BTech", "institution": "IIIT", "year": "2026"}, {"degree": "", "institution": "", "year": ""}],
+        "experience": [{"role": "Intern", "company": "Acme", "duration": "2025", "summary": "Built things"}],
+        "socials": [{"label": "GitHub", "url": "https://github.com/asha"}, {"label": "", "url": ""}],
+    }
+    resp = client.put("/profile/me", json=body, headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["name"] == "Asha Rao"
+    assert data["skills"] == ["Python", "Go"]
+    assert len(data["education"]) == 1 and len(data["socials"]) == 1
+    assert client.get("/profile/me", headers=auth_headers).json()["experience"][0]["company"] == "Acme"
+
+
+def test_manual_profile_replaces_existing_one(client, with_profile):
+    resp = client.put("/profile/me", json={"skills": ["Rust"]}, headers=with_profile)
+    assert resp.status_code == 200
+    assert resp.json()["skills"] == ["Rust"]

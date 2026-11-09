@@ -115,6 +115,8 @@ class FakeBackend:
                 "posting_tags_not_in_profile": ["ml"],
                 "evidence": [{"text": "Trained a PyTorch vision model.", "similarity": 0.7,
                               "best_posting_passage": "Train vision models."}]})
+        if path == "/api/insights/ats":
+            return httpx.Response(200, json={"has_resume": True, "overall_score": 72, "queried_item": request.url.params.get("item_id")})
         if path == "/api/bookmarks/ids":
             return httpx.Response(200, json={"ids": self.bookmarks})
         if path == "/api/bookmarks":
@@ -240,6 +242,13 @@ async def test_resume_match_and_cover_letter_use_resume_lines(backend):
         prompt = await client.get_prompt("cover_letter", {"id": "1"})
     assert match["evidence"] == [{"text": "Trained a PyTorch vision model.", "similarity": 0.7}]
     assert "- Trained a PyTorch vision model." in prompt.messages[0].content.text
+
+
+async def test_ats_check_resume_passes_posting_id(backend):
+    async with make_client(backend) as client:
+        general = await call(client, "ats_check_resume")
+        targeted = await call(client, "ats_check_resume", id=3)
+    assert general["queried_item"] is None and targeted["queried_item"] == "3"
 
 
 # ── Bookmarks & deadlines ────────────────────────────────────────────────────

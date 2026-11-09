@@ -1,16 +1,46 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import re
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
 from app.db import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
+from app.config import settings
+from app.schemas.profile import ResumePreview
+from app.schemas.user import (
+    OTPSendRequest,
+    OTPSendResponse,
+    OTPVerifyRequest,
+    OTPVerifyResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+    Token,
+)
+from app.services import otp as otp_service
+from app.services.errors import InvalidPDFError
+from app.services.mailer import MailerError, send_email
+from app.services.resume_service import ResumeProfileService
 from app.middleware.auth import create_access_token
-from app.rate_limit import limiter, login_limit, register_limit
+from app.rate_limit import limiter, login_limit, otp_limit, register_limit, upload_limit
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+_DUMMY_HASH = pwd_context.hash("not-a-real-password")
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$")
+_MAX_RESUME_BYTES = 5 * 1024 * 1024
+_resume_service = ResumeProfileService()
+
+
+def _valid_email(email: str) -> str:
+    cleaned = email.strip()
+    if len(cleaned) > 254 or not _EMAIL_PATTERN.match(cleaned):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Enter a valid email address.")
+    return cleaned
 
 
 class RegisterResponse(UserResponse):
@@ -39,8 +69,16 @@ def register(request: Request, user_data: UserCreate, db: Session = Depends(get_
     This eliminates the register → login redirect round-trip and enables
     the frontend to redirect directly to /profile after registration.
     """
+    if settings.REQUIRE_EMAIL_VERIFICATION and not otp_service.token_matches_email(
+        user_data.verification_token, user_data.email
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verify your email address before creating the account.",
+        )
+
     # Check if email already exists
-    existing = db.query(User).filter(User.email == user_data.email).first()
+    existing = db.query(User).filter(func.lower(User.email) == user_data.email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -87,8 +125,10 @@ def login(request: Request, user_data: UserLogin, db: Session = Depends(get_db))
     Verifies email and password, then generates an access token.
     """
     # Find user by email
-    user = db.query(User).filter(User.email == user_data.email).first()
+    user = db.query(User).filter(func.lower(User.email) == user_data.email).first()
     if not user:
+        # Spend the same time as a real check so response timing doesn't reveal which emails exist.
+        pwd_context.verify(user_data.password, _DUMMY_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -105,3 +145,61 @@ def login(request: Request, user_data: UserLogin, db: Session = Depends(get_db))
     access_token = create_access_token(data={"sub": str(user.id)})
 
     return Token(access_token=access_token)
+
+
+@router.post("/resume-preview", response_model=ResumePreview)
+@limiter.limit(upload_limit)
+async def resume_preview(request: Request, file: UploadFile = File(...)):
+    """Read the name, email and links from a resume to pre-fill signup. Nothing is stored."""
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only PDF files are accepted")
+    pdf_bytes = await file.read(_MAX_RESUME_BYTES + 1)
+    if len(pdf_bytes) > _MAX_RESUME_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File size must be under 5MB")
+    if not pdf_bytes.startswith(b"%PDF"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is not a valid PDF")
+    try:
+        return await _resume_preview(pdf_bytes)
+    except InvalidPDFError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+async def _resume_preview(pdf_bytes: bytes) -> ResumePreview:
+    return await _resume_service.preview_resume(pdf_bytes)
+
+
+@router.post("/otp/send", response_model=OTPSendResponse)
+@limiter.limit(otp_limit)
+async def send_otp(request: Request, body: OTPSendRequest, db: Session = Depends(get_db)):
+    """Email a 6-digit code that proves the address belongs to the person signing up."""
+    email = _valid_email(body.email)
+    if db.query(User).filter(func.lower(User.email) == email.lower()).first():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    try:
+        code = otp_service.issue_code(email)
+    except otp_service.OTPError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+    try:
+        delivered = await send_email(
+            email,
+            "Your UniCompass verification code",
+            f"Your UniCompass verification code is {code}.\n\n"
+            "It expires in 10 minutes. If you did not request it, you can ignore this email.",
+        )
+    except MailerError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return OTPSendResponse(sent=True, delivered=delivered)
+
+
+@router.post("/otp/verify", response_model=OTPVerifyResponse)
+@limiter.limit(otp_limit)
+def verify_otp(request: Request, body: OTPVerifyRequest):
+    """Exchange a correct code for a short-lived token that /auth/register accepts."""
+    email = _valid_email(body.email)
+    try:
+        token = otp_service.check_code(email, body.code)
+    except otp_service.OTPError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return OTPVerifyResponse(verification_token=token)

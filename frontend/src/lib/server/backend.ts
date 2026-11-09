@@ -12,7 +12,11 @@ import { NextRequest, NextResponse } from "next/server";
 export const BACKEND_URL =
     process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export const SESSION_COOKIE = "uc_session";
+/**
+ * In production the `__Host-` prefix makes browsers accept the cookie only when it is
+ * Secure, set for the exact host (no Domain) and Path=/, so a sibling subdomain can't overwrite it.
+ */
+export const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-uc_session" : "uc_session";
 
 /** Matches the backend's ACCESS_TOKEN_EXPIRE_MINUTES when the token has no readable `exp`. */
 const DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24;
@@ -136,4 +140,68 @@ export async function startSession(request: NextRequest, backendPath: string): P
     const response = NextResponse.json({ ok: true });
     setSession(response, data.access_token);
     return response;
+}
+
+/** Forward an unauthenticated JSON POST (signup helpers such as email codes) and relay the answer. */
+export async function relayPublicJson(request: NextRequest, backendPath: string): Promise<NextResponse> {
+    if (isCrossSite(request)) return forbidden();
+
+    let body: unknown;
+    try {
+        body = await request.json();
+    } catch {
+        return NextResponse.json({ detail: "Invalid request body." }, { status: 400 });
+    }
+
+    let upstream: Response;
+    try {
+        upstream = await fetch(`${BACKEND_URL}${backendPath}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json", ...clientHeaders(request) },
+            body: JSON.stringify(body),
+            cache: "no-store",
+        });
+    } catch {
+        return NextResponse.json({ detail: "Could not reach the server." }, { status: 502 });
+    }
+    return relayJson(upstream);
+}
+
+/** Forward a resume PDF to the signup pre-fill endpoint; nothing is stored. */
+export async function relayResumePreview(request: NextRequest): Promise<NextResponse> {
+    if (isCrossSite(request)) return forbidden();
+
+    let incoming: FormData;
+    try {
+        incoming = await request.formData();
+    } catch {
+        return NextResponse.json({ detail: "Invalid upload." }, { status: 400 });
+    }
+    const file = incoming.get("file");
+    if (!(file instanceof File)) return NextResponse.json({ detail: "Choose a PDF file." }, { status: 400 });
+    if (file.size > 5 * 1024 * 1024) return NextResponse.json({ detail: "File size must be under 5MB" }, { status: 413 });
+
+    const outgoing = new FormData();
+    outgoing.append("file", file, file.name);
+
+    let upstream: Response;
+    try {
+        upstream = await fetch(`${BACKEND_URL}/auth/resume-preview`, {
+            method: "POST",
+            headers: { Accept: "application/json", ...clientHeaders(request) },
+            body: outgoing,
+            cache: "no-store",
+        });
+    } catch {
+        return NextResponse.json({ detail: "Could not reach the server." }, { status: 502 });
+    }
+    return relayJson(upstream);
+}
+
+async function relayJson(upstream: Response): Promise<NextResponse> {
+    const data = await upstream.json().catch(() => ({ detail: "Request failed." }));
+    const headers: Record<string, string> = { "Cache-Control": "no-store" };
+    const retryAfter = upstream.headers.get("retry-after");
+    if (retryAfter) headers["Retry-After"] = retryAfter;
+    return NextResponse.json(data, { status: upstream.status, headers });
 }

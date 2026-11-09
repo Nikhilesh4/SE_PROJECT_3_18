@@ -226,6 +226,14 @@ def create_server(api_factory: Callable[[], UniCompassAPI] = UniCompassAPI.from_
             line.pop("best_posting_passage", None)
         return result
 
+    @mcp.tool(annotations=READ_ONLY)
+    async def ats_check_resume(id: int | None = None) -> dict[str, Any]:
+        """ATS check of the student's resume: a score, which standard sections/contact details/layout
+        rules pass or fail, and concrete fixes. Pass a posting `id` to also get keyword coverage for
+        that job (matched vs missing keywords) and what to change to match it. Never suggest adding
+        a skill the student doesn't have; frame missing ones as gaps to learn or build."""
+        return await call(api().ats_check, id)
+
     # ── Tools: bookmarks ─────────────────────────────────────────────
 
     @mcp.tool(annotations=READ_ONLY)

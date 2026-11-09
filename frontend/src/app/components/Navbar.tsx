@@ -11,16 +11,7 @@ const LINK_CLASS = "text-slate-700 hover:text-slate-900 transition-colors text-s
 
 const PRIMARY_LINKS = [
     { href: "/feed", label: "Feed" },
-    { href: "/search", label: "Search" },
-    { href: "/applications", label: "Applications" },
     { href: "/assistant", label: "Assistant" },
-];
-
-const MORE_LINKS = [
-    { href: "/bookmarks", label: "Bookmarks" },
-    { href: "/missions", label: "Missions" },
-    { href: "/insights", label: "Market insights" },
-    { href: "/research", label: "Research scout" },
 ];
 
 export default function Navbar() {
@@ -75,7 +66,7 @@ export default function Navbar() {
                                     {l.label}
                                 </Link>
                             ))}
-                            <div ref={moreRef} className="relative">
+                            <div ref={moreRef} className="relative md:hidden">
                                 <button
                                     onClick={() => setMoreOpen((o) => !o)}
                                     aria-expanded={moreOpen}
@@ -90,17 +81,6 @@ export default function Navbar() {
                                 {moreOpen && (
                                     <div role="menu" className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
                                         {PRIMARY_LINKS.map((l) => (
-                                            <Link
-                                                key={l.href}
-                                                href={l.href}
-                                                role="menuitem"
-                                                onClick={() => setMoreOpen(false)}
-                                                className="block md:hidden px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                                            >
-                                                {l.label}
-                                            </Link>
-                                        ))}
-                                        {MORE_LINKS.map((l) => (
                                             <Link
                                                 key={l.href}
                                                 href={l.href}

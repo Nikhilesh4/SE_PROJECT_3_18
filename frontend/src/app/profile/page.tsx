@@ -8,15 +8,34 @@ import api from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { invalidateProfileCache } from "@/lib/useProfile";
 import ProfileDisplay from "./components/ProfileDisplay";
+import ProfileHeader from "./components/ProfileHeader";
+import ApplicationsTab from "./components/ApplicationsTab";
+import BookmarksTab from "./components/BookmarksTab";
+import MissionsTab from "./components/MissionsTab";
 import ResumeUpload from "./components/ResumeUpload";
+import ProfileEditor from "./components/ProfileEditor";
 import { ProfileData } from "./components/types";
 
 type ErrorResponse = { detail?: string };
+
+const TABS = [
+    { id: "overview", label: "Overview" },
+    { id: "applications", label: "Applications" },
+    { id: "bookmarks", label: "Bookmarks" },
+    { id: "missions", label: "Missions" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
 
 function ProfilePageInner() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const isNewUser = searchParams.get("new") === "true";
+    const tabParam = searchParams.get("tab");
+    const tab: TabId = TABS.some((t) => t.id === tabParam) ? (tabParam as TabId) : "overview";
+
+    const selectTab = (id: TabId) => {
+        router.replace(id === "overview" ? "/profile" : `/profile?tab=${id}`, { scroll: false });
+    };
 
     const { isAuthenticated, checking } = useAuth();
 
@@ -25,6 +44,7 @@ function ProfilePageInner() {
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(true);
     const [uploadDone, setUploadDone] = useState(false);
+    const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
         if (checking || !isAuthenticated) return;
@@ -52,8 +72,16 @@ function ProfilePageInner() {
         setProfile(data);
         setError("");
         setUploadDone(true);
+        setUpdating(false);
         // Invalidate the shared module-level profile cache so useFeed
         // picks up the new skills on the next feed load.
+        invalidateProfileCache(data);
+    };
+
+    const handleManualSaved = (data: ProfileData) => {
+        setProfile(data);
+        setError("");
+        setUpdating(false);
         invalidateProfileCache(data);
     };
 
@@ -136,33 +164,25 @@ function ProfilePageInner() {
                     </div>
                 )}
 
-                <header className="mb-2">
-                    <div className="flex items-center gap-3 mb-2">
-                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-                            Profile Builder
-                        </h1>
-                        {profile && (
-                            <div
-                                title={
-                                    profile.from_cache
-                                        ? "Served from Redis cache (fast path)"
-                                        : "Freshly fetched from PostgreSQL (cache miss)"
-                                }
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all ${
-                                    profile.from_cache
-                                        ? "bg-amber-50 border-amber-300 text-amber-700"
-                                        : "bg-emerald-50 border-emerald-300 text-emerald-700"
-                                }`}
-                            >
-                                <span>{profile.from_cache ? "⚡ Redis Cache" : "🗄️ PostgreSQL DB"}</span>
-                            </div>
-                        )}
-                    </div>
-                    <p className="text-slate-600 text-sm">
-                        Upload your resume PDF to generate a structured profile. Your
-                        extracted skills are used to personalise your discovery feed.
-                    </p>
-                </header>
+                {profile && <ProfileHeader profile={profile} />}
+
+                <nav aria-label="Profile sections" className="flex gap-1 overflow-x-auto border-b border-slate-200">
+                    {TABS.map((t) => (
+                        <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => selectTab(t.id)}
+                            aria-current={tab === t.id ? "page" : undefined}
+                            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px cursor-pointer transition-colors ${
+                                tab === t.id
+                                    ? "border-indigo-600 text-indigo-700"
+                                    : "border-transparent text-slate-600 hover:text-slate-900"
+                            }`}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </nav>
 
                 {error && (
                     <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -170,30 +190,66 @@ function ProfilePageInner() {
                     </div>
                 )}
 
-                <ResumeUpload
-                    isUploading={isUploading}
-                    onUploadStart={() => setIsUploading(true)}
-                    onUploadEnd={() => setIsUploading(false)}
-                    onUploadSuccess={handleUploadSuccess}
-                    onError={setError}
-                />
+                {tab === "applications" && <ApplicationsTab />}
+                {tab === "bookmarks" && <BookmarksTab />}
+                {tab === "missions" && <MissionsTab />}
 
-                {isLoading ? (
+                {tab === "overview" && (
+                    <>
+                {/* Update mode (or first-time setup): only the resume upload and the profile editor */}
+                {updating || (!isLoading && !profile) ? (
+                    <>
+                        <ResumeUpload
+                            isUploading={isUploading}
+                            onUploadStart={() => setIsUploading(true)}
+                            onUploadEnd={() => setIsUploading(false)}
+                            onUploadSuccess={handleUploadSuccess}
+                            onError={setError}
+                        />
+                        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Edit your profile</h2>
+                            <p className="mt-1 mb-5 text-sm text-slate-600">
+                                Or enter and change your details by hand. Saving replaces what is shown on your profile.
+                            </p>
+                            <ProfileEditor
+                                key={profile?.updated_at ?? "new"}
+                                initial={profile}
+                                submitLabel="Save profile"
+                                onSaved={handleManualSaved}
+                                onCancel={profile ? () => setUpdating(false) : undefined}
+                            />
+                        </section>
+                        {profile && (
+                            <button
+                                type="button"
+                                onClick={() => setUpdating(false)}
+                                className="text-sm text-slate-500 hover:text-slate-700 cursor-pointer"
+                            >
+                                ← Back to profile
+                            </button>
+                        )}
+                    </>
+                ) : isLoading ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 text-center">
                         Loading profile...
                     </div>
-                ) : profile ? (
-                    <ProfileDisplay profile={profile} onProfileChange={handleProfileChange} />
                 ) : (
-                    !uploadDone && (
-                        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
-                            <div className="text-4xl mb-3">📄</div>
-                            <p className="text-slate-700 font-medium">No profile yet</p>
-                            <p className="text-sm text-slate-500 mt-1">
-                                Upload your resume above to generate a structured profile.
-                            </p>
-                        </div>
+                    profile && (
+                        <>
+                            <div className="flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => { setError(""); setUploadDone(false); setUpdating(true); }}
+                                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 cursor-pointer"
+                                >
+                                    ✏️ Update profile
+                                </button>
+                            </div>
+                            <ProfileDisplay profile={profile} onProfileChange={handleProfileChange} />
+                        </>
                     )
+                )}
+                    </>
                 )}
             </div>
         </div>

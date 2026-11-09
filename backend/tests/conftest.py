@@ -150,6 +150,14 @@ def db(database):
         conn.execute(text("TRUNCATE users, rss_items RESTART IDENTITY CASCADE"))
 
 
+@pytest.fixture(autouse=True)
+def _no_email_verification(monkeypatch):
+    """Most tests register users directly; test_otp.py turns verification back on."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "REQUIRE_EMAIL_VERIFICATION", False)
+
+
 @pytest.fixture
 def client(db):
     # Not used as a context manager, so the lifespan (background workers) never starts.

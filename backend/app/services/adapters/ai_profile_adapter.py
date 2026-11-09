@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 import httpx
 
 from app.config import settings
-from app.schemas.profile import EducationItem, ExperienceItem, ProfileStructured
+from app.schemas.profile import EducationItem, ExperienceItem, ProfileStructured, SocialLink
 from app.services.errors import (
     AIResponseParseError,
     AIServiceTimeoutError,
@@ -23,6 +23,8 @@ GEMINI_MODEL = "gemini-2.5-flash"
 PROMPT = """You are a resume parser.
 Extract information from the resume text and return ONLY a valid JSON object.
 Use exactly these keys:
+- name: the candidate's full name as written at the top of the resume (string, empty if absent)
+- socials: list of objects with keys label (e.g. LinkedIn, GitHub, Portfolio, LeetCode, Twitter) and url, taken only from links or handles that appear in the resume; never invent one
 - skills: list of strings
 - education: list of objects with keys degree, institution, year
 - experience: list of objects with keys role, company, duration, summary
@@ -179,7 +181,24 @@ class AIProfileAdapter:
             for item in self._ensure_dict_list(experience_raw)
         ]
 
+        socials: List[SocialLink] = []
+        seen_urls: set[str] = set()
+        for item in self._ensure_dict_list(data.get("socials")):
+            url = str(item.get("url", "")).strip()
+            if not url or url.lower().startswith(("javascript:", "data:")):
+                continue
+            if "@" in url and "://" not in url and not url.startswith("mailto:"):
+                url = "mailto:" + url
+            elif "://" not in url and not url.startswith("mailto:"):
+                url = "https://" + url.lstrip("/")
+            if url.lower() in seen_urls:
+                continue
+            seen_urls.add(url.lower())
+            socials.append(SocialLink(label=str(item.get("label", "")).strip()[:40], url=url[:300]))
+
         return ProfileStructured(
+            name=str(data.get("name") or "").strip()[:120],
+            socials=socials[:10],
             skills=skills,
             education=education,
             experience=experience,

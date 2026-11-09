@@ -97,4 +97,8 @@ async function proxy(request: NextRequest): Promise<NextResponse> {
     return response;
 }
 
-export { proxy as GET, proxy as POST, proxy as PUT, proxy as PATCH, proxy as DELETE };
+export const GET = (request: NextRequest) => proxy(request);
+export const POST = (request: NextRequest) => proxy(request);
+export const PUT = (request: NextRequest) => proxy(request);
+export const PATCH = (request: NextRequest) => proxy(request);
+export const DELETE = (request: NextRequest) => proxy(request);

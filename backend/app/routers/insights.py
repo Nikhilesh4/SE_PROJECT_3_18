@@ -2,6 +2,7 @@
 
   GET    /api/search                     full-text search + facets (category, source, remote, stipend, deadline)
   GET    /api/insights/items/{id}        why it ranks, skill gap, scam / eligibility / stipend signals (auth)
+  GET    /api/insights/ats?item_id=      ATS check of the user's resume, optionally against one posting (auth)
   GET    /api/insights/trends            skill demand and stipend stats across recent postings
   POST   /api/feedback/{id}              {"value": "up" | "down" | "hide"} (auth)
   DELETE /api/feedback/{id}              undo (auth)
@@ -26,6 +27,7 @@ from app.models.activity import ItemFeedback
 from app.models.rss_item import RssItem
 from app.models.user import User
 from app.repositories.profile_repository import ProfileRepository
+from app.services import ats
 from app.services.insights import explain, signals
 from app.services.rss.cache_service import RssCacheService
 
@@ -106,6 +108,21 @@ def search(
 
 
 # ── Per-posting insights ─────────────────────────────────────────────────────
+
+@router.get("/insights/ats")
+def ats_check(
+    item_id: Optional[int] = Query(None, description="Posting to match the resume against; omit for a general ATS check"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    profile = ProfileRepository().get_by_user_id(db, user.id)
+    item = None
+    if item_id is not None:
+        item = db.get(RssItem, item_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Opportunity not found.")
+    return ats.check_resume(profile, item)
+
 
 @router.get("/insights/items/{item_id}")
 def item_insights(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:

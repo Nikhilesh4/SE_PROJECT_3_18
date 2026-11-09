@@ -1,14 +1,27 @@
 import json
+import re
 from typing import Any, List
 
 from sqlalchemy.orm import Session
 
 from app.repositories.profile_repository import ProfileRepository
-from app.schemas.profile import EducationItem, ExperienceItem, ProfileOut, ProfileUpdate
+from app.schemas.profile import EducationItem, ExperienceItem, ProfileManual, ProfileOut, ProfileStructured, ProfileUpdate, ResumePreview, SocialLink
 from app.services.adapters.ai_profile_adapter import AIProfileAdapter
 from app.services.adapters.pdf_extractor import PDFExtractor
 from app.services.events import publish_profile_updated
 from app.services.matching.semantic import refresh_profile_embedding
+
+
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}")
+
+
+def extract_email(text: str) -> str:
+    """First email in the resume; an explicit mailto: link wins over text that merely looks like one."""
+    mailto = re.search(r"mailto:\s*(" + _EMAIL_RE.pattern + ")", text, re.IGNORECASE)
+    if mailto:
+        return mailto.group(1).lower()
+    found = _EMAIL_RE.search(text)
+    return found.group(0).lower() if found else ""
 
 
 class ResumeProfileService:
@@ -36,6 +49,25 @@ class ResumeProfileService:
 
         return self._to_profile_out(profile)
 
+    async def preview_resume(self, pdf_bytes: bytes) -> ResumePreview:
+        """Read name, email and links from a resume without saving anything (used before signup)."""
+        raw_text = self._pdf_extractor.extract(pdf_bytes)
+        email = extract_email(raw_text)
+        try:
+            structured = await self._ai_adapter.structure(raw_text)
+        except Exception:
+            # The email alone is still useful if the AI step is unavailable.
+            return ResumePreview(email=email)
+        return ResumePreview(
+            name=structured.name,
+            email=email,
+            socials=structured.socials,
+            skills=structured.skills[:40],
+            interests=structured.interests[:20],
+            education=structured.education[:10],
+            experience=structured.experience[:10],
+        )
+
     def get_profile(self, db: Session, user_id: int) -> ProfileOut | None:
         profile = self._repository.get_by_user_id(db, user_id)
         if profile is None:
@@ -55,6 +87,14 @@ class ResumeProfileService:
             return None
         refresh_profile_embedding(db, profile)
 
+        publish_profile_updated(user_id)
+        return self._to_profile_out(profile)
+
+    def save_manual_profile(self, db: Session, user_id: int, data: ProfileManual) -> ProfileOut:
+        profile = self._repository.save_manual(
+            db=db, user_id=user_id, data=ProfileStructured(**data.model_dump())
+        )
+        refresh_profile_embedding(db, profile)
         publish_profile_updated(user_id)
         return self._to_profile_out(profile)
 
@@ -81,7 +121,15 @@ class ResumeProfileService:
             for item in experience_items
         ]
 
+        socials = [
+            SocialLink(label=str(i.get("label", "")).strip(), url=str(i.get("url", "")).strip())
+            for i in self._parse_json_list(getattr(profile, "parsed_socials", None))
+            if str(i.get("url", "")).strip()
+        ]
+
         return ProfileOut(
+            name=getattr(profile, "parsed_name", None) or "",
+            socials=socials,
             skills=profile.parsed_skills or [],
             education=education,
             experience=experience,

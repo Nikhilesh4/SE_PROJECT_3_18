@@ -21,8 +21,8 @@ function timeAgo(iso: string | null): string {
 }
 
 function hrefFor(n: AppNotification): string {
-    if (n.kind === "mission") return "/missions";
-    if (n.kind === "digest") return "/applications";
+    if (n.kind === "mission") return "/profile?tab=missions";
+    if (n.kind === "digest") return "/profile?tab=applications";
     return n.rss_item_id != null ? `/feed/${encodeURIComponent(String(n.rss_item_id))}?by=id` : "/feed";
 }
 

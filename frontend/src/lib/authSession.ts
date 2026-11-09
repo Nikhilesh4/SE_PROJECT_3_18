@@ -80,6 +80,57 @@ export function useSession(): boolean | null {
 
 export class AuthRequestError extends Error {}
 
+async function postJson<T>(path: string, payload: Record<string, string>, failure: string): Promise<T> {
+    let res: Response;
+    try {
+        res = await fetch(path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+    } catch {
+        throw new AuthRequestError(`${failure}. Please try again.`);
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new AuthRequestError(typeof body.detail === "string" ? body.detail : failure);
+    return body as T;
+}
+
+export interface ResumePreview {
+    name: string;
+    email: string;
+    socials: { label: string; url: string }[];
+    skills: string[];
+    interests: string[];
+    education: { degree: string; institution: string; year: string }[];
+    experience: { role: string; company: string; duration: string; summary: string }[];
+}
+
+/** Read name and email from a resume to pre-fill signup; nothing is saved. */
+export async function previewResume(file: File): Promise<ResumePreview> {
+    const form = new FormData();
+    form.append("file", file);
+    let res: Response;
+    try {
+        res = await fetch("/api/session/resume-preview", { method: "POST", body: form });
+    } catch {
+        throw new AuthRequestError("Could not read the resume. Please try again.");
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new AuthRequestError(typeof body.detail === "string" ? body.detail : "Could not read the resume.");
+    return body as ResumePreview;
+}
+
+/** Email a verification code. `delivered` is false when the server has no mail setup (dev). */
+export async function sendEmailCode(email: string): Promise<{ delivered: boolean }> {
+    return postJson("/api/session/otp/send", { email }, "Could not send the code");
+}
+
+export async function verifyEmailCode(email: string, code: string): Promise<string> {
+    const body = await postJson<{ verification_token: string }>("/api/session/otp/verify", { email, code }, "Could not verify the code");
+    return body.verification_token;
+}
+
 async function postCredentials(path: string, payload: Record<string, string>, failure: string): Promise<void> {
     let res: Response;
     try {
@@ -103,8 +154,12 @@ export function login(email: string, password: string): Promise<void> {
     return postCredentials("/api/session/login", { email, password }, "Login failed");
 }
 
-export function register(name: string, email: string, password: string): Promise<void> {
-    return postCredentials("/api/session/register", { name, email, password }, "Registration failed");
+export function register(name: string, email: string, password: string, verificationToken: string): Promise<void> {
+    return postCredentials(
+        "/api/session/register",
+        { name, email, password, verification_token: verificationToken },
+        "Registration failed"
+    );
 }
 
 export async function logout(): Promise<void> {

@@ -35,3 +35,17 @@ def test_protected_route_requires_token(client):
     assert client.get("/api/bookmarks").status_code == 401
     bad = client.get("/api/bookmarks", headers={"Authorization": "Bearer not-a-jwt"})
     assert bad.status_code == 401
+
+
+def test_short_password_is_rejected(client):
+    resp = client.post("/auth/register", json={"name": "A", "email": "short@example.com", "password": "abc12"})
+    assert resp.status_code == 422
+
+
+def test_email_is_case_insensitive(client):
+    body = {"name": "Case", "email": "  Case@Example.com ", "password": "pw-123456"}
+    assert client.post("/auth/register", json=body).status_code == 201
+    login = client.post("/auth/login", json={"email": "CASE@example.COM", "password": "pw-123456"})
+    assert login.status_code == 200
+    dup = client.post("/auth/register", json={**body, "email": "case@example.com"})
+    assert dup.status_code == 400
