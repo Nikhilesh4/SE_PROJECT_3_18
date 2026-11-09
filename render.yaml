@@ -11,9 +11,7 @@ services:
     dockerContext: .            # repo root: the image also needs ./mcp-server
     plan: starter               # always-on; the free plan sleeps, which would stop the workers
     healthCheckPath: /health
-    # --proxy-headers makes rate limits use the visitor's IP (forwarded by the Next.js proxy)
-    # instead of one shared proxy IP.
-    dockerCommand: sh -c "uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'"
+    # Start command comes from backend/Dockerfile (it reads $PORT, which Render sets).
     envVars:
       - key: DATABASE_URL
         fromDatabase: {name: unicompass-db, property: connectionString}

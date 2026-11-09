@@ -17,4 +17,6 @@ USER app
 
 EXPOSE 8000
 # The API serves requests only; workers run in the separate `worker` service.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Hosts such as Render inject $PORT; locally it falls back to 8000. --proxy-headers makes rate limits
+# use the visitor's IP (forwarded by the Next.js proxy) instead of the proxy's.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
