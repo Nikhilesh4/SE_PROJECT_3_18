@@ -3,11 +3,8 @@
 import { useEffect, useState } from "react";
 import PageShell, { ErrorNote, Spinner } from "@/app/components/PageShell";
 import { errorMessage } from "@/lib/errors";
+import PaySection from "./PaySection";
 import { fetchCompanies, fetchTrends, type CompanyMatch, type Trends } from "@/lib/insights";
-
-function inr(n: number): string {
-    return `₹${Math.round(n).toLocaleString("en-IN")}`;
-}
 
 export default function InsightsPage() {
     const [trends, setTrends] = useState<Trends | null>(null);
@@ -28,8 +25,6 @@ export default function InsightsPage() {
     }, []);
 
     const maxSkill = Math.max(1, ...(trends?.top_skills.map((s) => s.postings) ?? [1]));
-    const stipends = Object.entries(trends?.stipend_inr_month ?? {});
-    const maxMedian = Math.max(1, ...stipends.map(([, v]) => v.median));
 
     return (
         <PageShell
@@ -60,30 +55,7 @@ export default function InsightsPage() {
                         )}
                     </section>
 
-                    <section aria-labelledby="stipend-h" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h2 id="stipend-h" className="font-semibold text-slate-900 mb-1">Stipend by category</h2>
-                        <p className="text-xs text-slate-500 mb-4">Median of postings that state an amount, converted to ₹ per month.</p>
-                        {stipends.length === 0 ? (
-                            <p className="text-sm text-slate-500">No postings state a stipend yet.</p>
-                        ) : (
-                            <ul className="space-y-3">
-                                {stipends.map(([cat, v]) => (
-                                    <li key={cat}>
-                                        <div className="flex items-baseline justify-between text-sm">
-                                            <span className="capitalize text-slate-700">{cat}</span>
-                                            <span className="font-semibold text-slate-900 tabular-nums">{inr(v.median)}</span>
-                                        </div>
-                                        <span className="mt-1 block h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                                            <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${(v.median / maxMedian) * 100}%` }} />
-                                        </span>
-                                        <p className="text-[11px] text-slate-400 mt-0.5">
-                                            {inr(v.min)} – {inr(v.max)} · {v.count} posting{v.count === 1 ? "" : "s"}
-                                        </p>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
+                    <PaySection />
 
                     <section aria-labelledby="cat-h" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h2 id="cat-h" className="font-semibold text-slate-900 mb-3">Postings by category</h2>

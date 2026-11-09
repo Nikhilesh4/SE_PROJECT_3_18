@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timedelta, timezone
-from statistics import median
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -133,6 +132,26 @@ def item_insights(item_id: int, user: User = Depends(get_current_user), db: Sess
     }
 
 
+def _priced_rows(db: Session, since: datetime, category: Optional[str] = None) -> tuple[list[tuple[RssItem, float]], dict]:
+    """Postings that state pay, as (row, INR/month), with prizes and implausible values left out."""
+    q = db.query(RssItem).filter(RssItem.visible(), func.coalesce(RssItem.published_at, RssItem.created_at) >= since)
+    if category:
+        q = q.filter(RssItem.category == category)
+    priced: list[tuple[RssItem, float]] = []
+    skipped = {"not_pay_category": 0, "out_of_range": 0}
+    for r in q.limit(5000).all():
+        stipend = signals.extract_stipend(f"{r.title}\n{r.summary or ''}")
+        if not stipend:
+            continue
+        if r.category in signals.STIPEND_EXCLUDED_CATEGORIES:
+            skipped["not_pay_category"] += 1
+        elif not signals.stipend_in_range(stipend["amount"]):
+            skipped["out_of_range"] += 1
+        else:
+            priced.append((r, stipend["amount"]))
+    return priced, skipped
+
+
 @router.get("/insights/trends")
 def trends(
     days: int = Query(30, ge=1, le=180),
@@ -143,22 +162,65 @@ def trends(
     rows = db.query(RssItem).filter(RssItem.visible(), func.coalesce(RssItem.published_at, RssItem.created_at) >= since).limit(5000).all()
     skill_counts: Counter[str] = Counter()
     by_category: Counter[str] = Counter()
-    stipends: dict[str, list[float]] = {}
     for r in rows:
         by_category[r.category] += 1
         skill_counts.update(set(signals.extract_skills(f"{r.title}\n{r.summary or ''}\n{' '.join(r.tags or [])}")))
-        s = signals.extract_stipend(f"{r.title}\n{r.summary or ''}")
-        if s:
-            stipends.setdefault(r.category, []).append(s["amount"])
+    priced, _ = _priced_rows(db, since)
+    amounts: dict[str, list[float]] = {}
+    for r, amount in priced:
+        amounts.setdefault(r.category, []).append(amount)
     return {
         "days": days,
         "postings": len(rows),
         "by_category": dict(by_category),
         "top_skills": [{"skill": k, "postings": v} for k, v in skill_counts.most_common(limit)],
-        "stipend_inr_month": {
-            c: {"count": len(v), "median": round(median(v)), "min": round(min(v)), "max": round(max(v))}
-            for c, v in stipends.items()
-        },
+        "stipend_inr_month": {c: signals.summarize_amounts(v) for c, v in amounts.items()},
+    }
+
+
+@router.get("/insights/stipends")
+def stipend_insights(
+    days: int = Query(90, ge=7, le=365),
+    category: Optional[str] = Query(None, description="Limit to one category"),
+    min_samples: int = Query(3, ge=2, le=20, description="Smallest sample a skill or group needs to be reported"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """What postings actually pay, in INR per month, from the pay stated in the posting text.
+
+    Only postings that state an amount count (`coverage` says how many). Prizes (hackathons) and course
+    fees are not pay and are left out, as are implausible amounts. Medians and quartiles, not means.
+    """
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    total = (
+        db.query(func.count(RssItem.id))
+        .filter(RssItem.visible(), func.coalesce(RssItem.published_at, RssItem.created_at) >= since)
+        .scalar()
+        or 0
+    )
+    priced, skipped = _priced_rows(db, since, category)
+    by_cat: dict[str, list[float]] = {}
+    by_skill: dict[str, list[float]] = {}
+    remote: dict[str, list[float]] = {"remote": [], "onsite": []}
+    for r, amount in priced:
+        by_cat.setdefault(r.category, []).append(amount)
+        remote["remote" if signals.detect_remote(r.title, r.summary or "", r.tags) else "onsite"].append(amount)
+        for skill in set(signals.extract_skills(f"{r.title}\n{r.summary or ''}\n{' '.join(r.tags or [])}")):
+            by_skill.setdefault(skill, []).append(amount)
+    skills = [
+        {"skill": k, **signals.summarize_amounts(v)} for k, v in by_skill.items() if len(v) >= min_samples
+    ]
+    skills.sort(key=lambda x: (-x["median"], -x["count"], x["skill"]))
+    return {
+        "days": days,
+        "unit": "INR per month",
+        "postings": total,
+        "with_pay": len(priced),
+        "coverage": round(len(priced) / total, 3) if total else 0.0,
+        "overall": signals.summarize_amounts([a for _, a in priced]),
+        "by_category": {c: signals.summarize_amounts(v) for c, v in sorted(by_cat.items()) if len(v) >= 1},
+        "by_skill": skills[:15],
+        "remote": {k: signals.summarize_amounts(v) for k, v in remote.items() if len(v) >= min_samples},
+        "left_out": skipped,
     }
 
 

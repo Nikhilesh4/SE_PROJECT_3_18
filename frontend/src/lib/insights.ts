@@ -62,7 +62,34 @@ export interface Trends {
     postings: number;
     by_category: Record<string, number>;
     top_skills: { skill: string; postings: number }[];
-    stipend_inr_month: Record<string, { count: number; median: number; min: number; max: number }>;
+    stipend_inr_month: Record<string, PaySummary | null>;
+}
+
+/** Pay statistics in ₹ per month. */
+export interface PaySummary {
+    count: number;
+    p25: number;
+    median: number;
+    p75: number;
+    min: number;
+    max: number;
+}
+
+export interface PayInsights {
+    days: number;
+    unit: string;
+    postings: number;
+    with_pay: number;
+    coverage: number;
+    overall: PaySummary | null;
+    by_category: Record<string, PaySummary | null>;
+    by_skill: (PaySummary & { skill: string })[];
+    remote: Record<string, PaySummary | null>;
+    left_out: { not_pay_category: number; out_of_range: number };
+}
+
+export async function fetchPayInsights(category?: string): Promise<PayInsights> {
+    return (await api.get<PayInsights>("/api/insights/stipends", { params: category ? { category } : {} })).data;
 }
 
 export async function fetchTrends(): Promise<Trends> {

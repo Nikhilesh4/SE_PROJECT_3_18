@@ -25,7 +25,7 @@ class Backend:
         body = json.loads(request.content) if request.content else None
         self.calls.append((request.method, request.url.path, body or dict(request.url.params)))
         path = request.url.path
-        if request.headers.get("authorization") != "Bearer tok" and path not in ("/api/search", "/api/insights/trends"):
+        if request.headers.get("authorization") != "Bearer tok" and path not in ("/api/search", "/api/insights/trends", "/api/insights/stipends"):
             return httpx.Response(401, json={"detail": "no"})
         routes = {
             ("GET", "/api/applications"): {"total": 2, "statuses": [], "columns": {
@@ -40,6 +40,9 @@ class Backend:
             ("GET", "/api/insights/items/1"): {"skill_gap": {"coverage": 50}},
             ("GET", "/api/search"): {"total": 1, "facets": {}, "items": [ITEM]},
             ("GET", "/api/insights/trends"): {"top_skills": [{"skill": "python", "postings": 3}]},
+            ("GET", "/api/insights/stipends"): {"unit": "INR per month", "with_pay": 4, "coverage": 0.1, "postings": 40, "overall": {"median": 30000},
+                                                "by_category": {"internship": {"median": 30000}}, "remote": {}, "by_skill": [{"skill": "python", "median": 40000}] * 10,
+                                                "left_out": {}, "days": 90},
             ("GET", "/api/insights/company"): {"company": "Acme", "open_postings": 2},
             ("GET", "/api/insights/projects"): {"projects": [{"skill": "docker", "idea": "x"}]},
             ("POST", "/api/outreach/draft"): {"subject": "s", "body": "b", "review_note": "draft"},
@@ -117,3 +120,11 @@ async def test_career_standup_returns_facts_and_ranked_actions(session):
     assert s["next_actions"] == ["Apply to ML Intern before 12 Nov"]
     assert s["facts"]["saved"] == 1 and "actions" not in s["facts"]  # the duplicate action list is dropped
     assert ("GET", "/api/standup", {"polish": "false"}) in backend.calls
+
+
+async def test_pay_insights_trims_the_payload_and_passes_filters(session):
+    client, backend = session
+    d = await call(client, "pay_insights", {"category": "internship", "days": 30})
+    assert d["unit"] == "INR per month" and d["by_category"]["internship"]["median"] == 30000
+    assert len(d["skills_in_higher_paid_postings"]) == 8
+    assert ("GET", "/api/insights/stipends", {"days": "30", "category": "internship"}) in backend.calls

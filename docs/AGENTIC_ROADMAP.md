@@ -368,7 +368,7 @@ cd ../mcp-server && .venv/bin/pytest
 
 **Not built**
 - Reddit/Discord/Telegram watchers, funding-news "hidden market" scout, GitHub "good first issue" discovery.
-- Langfuse/external tracing (an `agent_runs` table exists), weekly career-standup agent, aggregate stipend insights.
+- Langfuse/external tracing (an `agent_runs` table exists).
 - Peer features (sharing, hackathon teams, campus feeds), autofill extension, GraphRAG, Researcher-Tailor-Writer-Reviewer pipeline.
 
 **Loose ends from section 6 not re-verified:** RemoteOK 410 sources, HTML entities in feed cards, "from 0 sources" header, `google.generativeai` deprecation, empty chat after a failed first message, demo account in the dev DB.
@@ -397,3 +397,11 @@ On the dev DB it hides 33 of 2,375 postings (podcasts, listicles, dev logs, erro
 ### Career standup (2026-11-09)
 
 The weekly digest was already a career standup (a notification each ISO week). It is now also available on demand: `GET /api/standup`, the MCP/assistant tool `career_standup`, and a "Your week" card on `/applications`. Actions are ranked and capped at three: no resume, deadlines closing within 7 days, an upcoming interview, stale applications (14+ days), a skill missing from the profile that most tracked roles ask for, new matches, nothing applied yet, no active mission. Everything is computed from the user's own rows; `polish=true` only lets the LLM reword the summary.
+
+### Pay insights (2026-11-09)
+
+Real data showed the old stipend numbers were wrong: `$120k` was read as per month (job median ₹4.2M/month), hackathon prizes counted as pay, `£70,000 K` was multiplied twice, and bare amounts like `$100` were treated as stipends. `extract_stipend` now infers a yearly salary for large bare amounts (per currency), reads whole unformatted numbers, and ignores bare amounts under 1,000. Search filters, missions and facets all use it, so they improved too.
+
+New `GET /api/insights/stipends` (and the `pay_insights` MCP/assistant tool, and a "What postings pay" section on `/insights`) reports median and middle half by category, remote vs on-site, and skills seen in higher-paid postings, with coverage (about 10% of postings state pay), the sample size beside every figure, and prizes, course fees and implausible amounts left out. `/insights/trends` uses the same cleaned data.
+
+Remaining caveat: most postings are US-remote, so INR conversions look large (job median about ₹760k/month, about $110k/yr); the page shows the USD-per-year equivalent beside every figure.

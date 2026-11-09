@@ -5,7 +5,7 @@ NAMES = [
     "search_opportunities", "get_opportunity", "upcoming_deadlines", "search_posting_text", "find_in_posting",
     "compare_opportunities", "match_resume_to_opportunity", "list_bookmarks", "bookmark_opportunity",
     "remove_bookmark", "list_applications", "update_application", "get_notifications", "list_missions",
-    "create_mission", "run_mission", "explain_opportunity", "search_with_filters", "skill_demand_trends",
+    "create_mission", "run_mission", "explain_opportunity", "search_with_filters", "skill_demand_trends", "pay_insights",
     "company_brief", "suggest_projects", "interview_questions", "draft_outreach", "research_scout",
     "search_my_notes", "career_standup", "get_profile", "update_profile", "gcal__create-event",
 ]
@@ -52,3 +52,8 @@ def test_selection_cuts_the_definitions_sent():
 def test_standup_questions_pull_the_standup_tool():
     assert "career_standup" in names("what should I do this week?")
     assert "career_standup" in names("give me my weekly standup")
+
+
+def test_pay_questions_pull_pay_insights():
+    assert "pay_insights" in names("how much do ML internships pay?")
+    assert "pay_insights" in names("what is the typical salary for devops")

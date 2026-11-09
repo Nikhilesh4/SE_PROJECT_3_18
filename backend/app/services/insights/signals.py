@@ -8,6 +8,7 @@ at, they never delete or hide a posting on their own.
 from __future__ import annotations
 
 import re
+import statistics
 from dataclasses import dataclass, field
 
 # ── Scam detection ───────────────────────────────────────────────────────────
@@ -78,10 +79,11 @@ def assess_scam_risk(title: str, summary: str, url: str = "") -> ScamAssessment:
 # ── Stipend ──────────────────────────────────────────────────────────────────
 
 _CURRENCY = r"(?P<cur>₹|rs\.?|inr|\$|usd|€|eur|£|gbp)"
-_NUM = r"(?P<num>\d{1,3}(?:,\d{2,3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s?(?P<mult>k|lpa|lakhs?|l)?"
+_NUM = r"(?P<num>\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s?(?P<mult>k|lpa|lakhs?|l)?"
 _PERIOD = r"(?:\s*(?:/|per|a)\s*(?P<per>month|mo|year|yr|annum|week|hour|hr|day))?"
 _STIPEND_RE = re.compile(rf"{_CURRENCY}\s?{_NUM}{_PERIOD}", re.I)
 _PER_MONTH = {"month": 1, "mo": 1, "year": 1 / 12, "yr": 1 / 12, "annum": 1 / 12, "week": 4.33, "hour": 160, "hr": 160, "day": 22}
+_INR_MARKERS = {"₹", "rs", "rs.", "inr"}
 _TO_INR = {"₹": 1, "rs": 1, "rs.": 1, "inr": 1, "$": 83, "usd": 83, "€": 90, "eur": 90, "£": 105, "gbp": 105}
 
 
@@ -96,22 +98,48 @@ def extract_stipend(text: str) -> dict | None:
         except ValueError:
             continue
         mult = (m.group("mult") or "").lower()
+        cur = m.group("cur").lower()
         if mult == "k":
-            num *= 1_000
+            if num < 1_000:  # "70,000 K" is a typo for 70k, not 70 million
+                num *= 1_000
         elif mult in ("lpa", "lakh", "lakhs", "l"):
             num *= 100_000
         period = (m.group("per") or "").lower()
         if not period and mult == "lpa":
             period = "year"
-        if num < 100 and not period and not mult:
-            continue  # a bare "$5" is not a stipend
+        if num < 1_000 and not period and not mult:
+            continue  # a bare "$100" or "$5" is a prize or price, not a stipend
         if not period:
-            period = "month" if num < 1_000_000 else "year"
+            # No period stated: a big bare number is a yearly salary ("$120k"), a smaller one a monthly stipend.
+            annual_from = 300_000 if cur in _INR_MARKERS else 15_000
+            period = "year" if num >= annual_from else "month"
         per_month = num * _PER_MONTH.get(period, 1)
-        cur = m.group("cur").lower()
         inr = per_month * _TO_INR.get(cur, 1)
         return {"amount": round(inr, 2), "currency": "INR", "period": "month", "raw": m.group(0).strip()}
     return None
+
+
+# Pay stats leave out categories whose amounts are not pay (prize pools, course fees) and implausible values.
+STIPEND_EXCLUDED_CATEGORIES = frozenset({"hackathon", "course"})
+STIPEND_SANE_RANGE = (3_000.0, 5_000_000.0)  # INR per month
+
+
+def stipend_in_range(amount: float) -> bool:
+    return STIPEND_SANE_RANGE[0] <= amount <= STIPEND_SANE_RANGE[1]
+
+
+def summarize_amounts(values: list[float]) -> dict | None:
+    """count, quartiles, median, min and max of INR/month amounts, or None for an empty list."""
+    vals = sorted(values)
+    if not vals:
+        return None
+    n = len(vals)
+    if n >= 4:
+        q1, _, q3 = statistics.quantiles(vals, n=4, method="inclusive")
+    else:
+        q1, q3 = vals[0], vals[-1]
+    return {"count": n, "p25": round(q1), "median": round(statistics.median(vals)), "p75": round(q3),
+            "min": round(vals[0]), "max": round(vals[-1])}
 
 
 # ── Remote / location ────────────────────────────────────────────────────────

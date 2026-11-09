@@ -181,6 +181,12 @@ class UniCompassAPI:
     async def applications(self) -> dict:
         return await self._request("GET", "/api/applications")
 
+    async def stipends(self, *, category: str | None = None, days: int = 90) -> dict:
+        params: dict[str, Any] = {"days": days}
+        if category:
+            params["category"] = category
+        return await self._request("GET", "/api/insights/stipends", auth=False, params=params)
+
     async def standup(self, *, polish: bool = False) -> dict:
         return await self._request("GET", "/api/standup", params={"polish": str(polish).lower()})
 

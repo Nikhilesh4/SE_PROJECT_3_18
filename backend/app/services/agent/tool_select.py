@@ -39,6 +39,10 @@ GROUPS: dict[str, tuple[str, tuple[str, ...]]] = {
         r"closing soon|minimum|at least",
         ("explain_opportunity", "search_with_filters", "skill_demand_trends", "company_brief", "suggest_projects"),
     ),
+    "pay": (
+        r"\bpay\b|\bpaid|salary|salaries|stipend|earn|compensation|how much|typical|average|going rate",
+        ("pay_insights",),
+    ),
     "coach": (
         r"interview|outreach|email|cold|referral|linkedin|cover letter|research|professor|lab\b|project|"
         r"note|memory|remember|follow.?up",

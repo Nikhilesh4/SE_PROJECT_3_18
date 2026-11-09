@@ -330,6 +330,15 @@ def create_server(api_factory: Callable[[], UniCompassAPI] = UniCompassAPI.from_
         return await call(api().trends)
 
     @mcp.tool(annotations=READ_ONLY)
+    async def pay_insights(category: Category | None = None, days: Annotated[int, Field(ge=7, le=365)] = 90) -> dict[str, Any]:
+        """What postings pay (INR per month; x12/83 for USD per year): median and middle half by category, remote vs on-site, and skills seen in higher-paid postings. Only postings that state an amount count; `coverage` says how many."""
+        d = await call(api().stipends, category=category, days=days)
+        return {
+            "unit": d["unit"], "postings_with_pay": d["with_pay"], "coverage": d["coverage"], "overall": d["overall"],
+            "by_category": d["by_category"], "remote_vs_onsite": d["remote"], "skills_in_higher_paid_postings": d["by_skill"][:8],
+        }
+
+    @mcp.tool(annotations=READ_ONLY)
     async def company_brief(name: str) -> dict[str, Any]:
         """What UniCompass has indexed about a company: open postings, skills in demand (and which the student has)."""
         return await call(api().company, name)
