@@ -176,6 +176,60 @@ class UniCompassAPI:
             "GET", f"/api/rag/items/{item_id}/resume-match", params={"limit": limit}
         )
 
+    # ── Tracker, notifications, missions, insights, coaching ─────────
+
+    async def applications(self) -> dict:
+        return await self._request("GET", "/api/applications")
+
+    async def update_application(self, item_id: int, *, status: str | None = None, notes: str | None = None) -> dict:
+        body = {k: v for k, v in {"status": status, "notes": notes}.items() if v is not None}
+        return await self._request("PATCH", f"/api/applications/{item_id}", json=body)
+
+    async def notifications(self, *, unread_only: bool = False, limit: int = 20) -> dict:
+        return await self._request("GET", "/api/notifications", params={"unread_only": str(unread_only).lower(), "limit": limit})
+
+    async def mark_notifications_read(self) -> dict:
+        return await self._request("POST", "/api/notifications/read", json={})
+
+    async def missions(self) -> dict:
+        return await self._request("GET", "/api/missions")
+
+    async def create_mission(self, name: str, query: str) -> dict:
+        return await self._request("POST", "/api/missions", json={"name": name, "query": query})
+
+    async def run_mission(self, mission_id: int) -> dict:
+        return await self._request("POST", f"/api/missions/{mission_id}/run")
+
+    async def item_insights(self, item_id: int) -> dict:
+        return await self._request("GET", f"/api/insights/items/{item_id}")
+
+    async def search(self, **params: Any) -> dict:
+        return await self._request("GET", "/api/search", auth=False, params={k: v for k, v in params.items() if v is not None})
+
+    async def trends(self) -> dict:
+        return await self._request("GET", "/api/insights/trends", auth=False)
+
+    async def company(self, name: str) -> dict:
+        return await self._request("GET", "/api/insights/company", params={"name": name})
+
+    async def projects(self, item_id: int) -> dict:
+        return await self._request("GET", "/api/insights/projects", params={"item_id": item_id})
+
+    async def draft_outreach(self, kind: str, *, item_id: int | None, recipient: str = "") -> dict:
+        body: dict[str, Any] = {"kind": kind, "recipient": recipient}
+        if item_id is not None:
+            body["item_id"] = item_id
+        return await self._request("POST", "/api/outreach/draft", json=body)
+
+    async def interview_questions(self, *, item_id: int | None, role: str = "") -> dict:
+        return await self._request("POST", "/api/interview/questions", json={"item_id": item_id, "role": role})
+
+    async def research_scout(self, topic: str) -> dict:
+        return await self._request("POST", "/api/research/scout", json={"topic": topic})
+
+    async def search_notes(self, query: str) -> dict:
+        return await self._request("GET", "/api/memory/search", params={"q": query})
+
 
 def _detail(resp: httpx.Response) -> str:
     try:
