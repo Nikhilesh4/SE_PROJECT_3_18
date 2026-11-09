@@ -181,6 +181,9 @@ class UniCompassAPI:
     async def applications(self) -> dict:
         return await self._request("GET", "/api/applications")
 
+    async def standup(self, *, polish: bool = False) -> dict:
+        return await self._request("GET", "/api/standup", params={"polish": str(polish).lower()})
+
     async def update_application(self, item_id: int, *, status: str | None = None, notes: str | None = None) -> dict:
         body = {k: v for k, v in {"status": status, "notes": notes}.items() if v is not None}
         return await self._request("PATCH", f"/api/applications/{item_id}", json=body)

@@ -273,6 +273,12 @@ def create_server(api_factory: Callable[[], UniCompassAPI] = UniCompassAPI.from_
         return {"id": id, "status": card["status"], "notes": card["notes"], "applied_at": card["applied_at"]}
 
     @mcp.tool(annotations=READ_ONLY)
+    async def career_standup() -> dict[str, Any]:
+        """The student's weekly career standup: tracker counts and up to 3 ranked next actions (deadlines, interviews, follow-ups, skill gaps)."""
+        data = await call(api().standup)
+        return {"facts": {k: v for k, v in data["facts"].items() if k != "actions"}, "next_actions": [a["text"] for a in data["actions"]]}
+
+    @mcp.tool(annotations=READ_ONLY)
     async def get_notifications(unread_only: bool = True) -> dict[str, Any]:
         """Recent notifications: new matches, deadlines closing, mission results and the weekly digest."""
         data = await call(api().notifications, unread_only=unread_only)

@@ -7,7 +7,7 @@ NAMES = [
     "remove_bookmark", "list_applications", "update_application", "get_notifications", "list_missions",
     "create_mission", "run_mission", "explain_opportunity", "search_with_filters", "skill_demand_trends",
     "company_brief", "suggest_projects", "interview_questions", "draft_outreach", "research_scout",
-    "search_my_notes", "get_profile", "update_profile", "gcal__create-event",
+    "search_my_notes", "career_standup", "get_profile", "update_profile", "gcal__create-event",
 ]
 SPECS = [ToolSpec(n, "d", {}) for n in NAMES]
 
@@ -47,3 +47,8 @@ def test_order_is_preserved_and_unknown_used_names_are_ignored():
 
 def test_selection_cuts_the_definitions_sent():
     assert len(select_tools(SPECS, "what is the stipend?")) <= 12
+
+
+def test_standup_questions_pull_the_standup_tool():
+    assert "career_standup" in names("what should I do this week?")
+    assert "career_standup" in names("give me my weekly standup")

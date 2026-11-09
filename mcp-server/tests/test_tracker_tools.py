@@ -32,6 +32,8 @@ class Backend:
                 "saved": [{"item": ITEM, "notes": "n", "status": "saved"}], "applied": [{"item": {**ITEM, "id": 2, "title": "B"}, "notes": "", "status": "applied"}]}},
             ("PATCH", "/api/applications/1"): {"status": body and body.get("status", "saved"), "notes": (body or {}).get("notes", ""), "applied_at": "2026-11-09"},
             ("GET", "/api/notifications"): {"unread": 1, "notifications": [{"id": 1, "kind": "deadline", "title": "Closing", "body": "b", "rss_item_id": 1, "created_at": "x", "read": False}]},
+            ("GET", "/api/standup"): {"facts": {"saved": 1, "applied": 0, "actions": ["x"]}, "text": "t",
+                                      "actions": [{"kind": "deadline", "text": "Apply to ML Intern before 12 Nov", "priority": 2, "item_id": 1}]},
             ("GET", "/api/missions"): {"missions": [{"id": 3, "name": "ML"}]},
             ("POST", "/api/missions"): {"id": 3, "name": (body or {}).get("name"), "remote_only": True},
             ("POST", "/api/missions/3/run"): {"new_matches": [{"id": 1}]},
@@ -107,3 +109,11 @@ async def test_coaching_tools(session):
     assert (await call(client, "search_my_notes", {"query": "maya"}))[0]["notes"] == "Maya said"
     missing = await client.call_tool("explain_opportunity", {"id": 99})
     assert missing.is_error and "Not found" in missing.content[0].text
+
+
+async def test_career_standup_returns_facts_and_ranked_actions(session):
+    client, backend = session
+    s = await call(client, "career_standup")
+    assert s["next_actions"] == ["Apply to ML Intern before 12 Nov"]
+    assert s["facts"]["saved"] == 1 and "actions" not in s["facts"]  # the duplicate action list is dropped
+    assert ("GET", "/api/standup", {"polish": "false"}) in backend.calls

@@ -31,8 +31,8 @@ GROUPS: dict[str, tuple[str, tuple[str, ...]]] = {
         ("list_applications", "update_application"),
     ),
     "missions": (
-        r"notification|notify|alert|mission|daily|watch|remind|standup|digest",
-        ("get_notifications", "list_missions", "create_mission", "run_mission"),
+        r"notification|notify|alert|mission|daily|watch|remind|standup|stand-up|digest|this week|what should i do|next steps?|priorit",
+        ("get_notifications", "list_missions", "create_mission", "run_mission", "career_standup"),
     ),
     "insights": (
         r"\bwhy\b|\bfit|gap|skill|scam|legit|eligib|explain|trend|demand|filter|paid|company|startup|"

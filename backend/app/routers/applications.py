@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -21,6 +23,7 @@ from app.middleware.auth import get_current_user
 from app.models.bookmark import APPLICATION_STATUSES, Bookmark
 from app.models.rss_item import RssItem
 from app.models.user import User
+from app.services.digest import build_digest
 from app.services.insights.ics import build_ics
 from app.services.rss.cache_service import RssCacheService
 
@@ -128,3 +131,16 @@ def calendar_export(user: User = Depends(get_current_user), db: Session = Depend
         media_type="text/calendar",
         headers={"Content-Disposition": 'attachment; filename="unicompass-deadlines.ics"'},
     )
+
+
+@router.get("/standup")
+async def standup(
+    polish: bool = Query(False, description="Let the LLM rewrite the summary (one model call)"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """The weekly career standup on demand: tracker counts and up to three ranked next actions.
+
+    Counts and actions are computed from the user's own data; `polish=true` only rewrites the text.
+    """
+    return await asyncio.to_thread(build_digest, db, user.id, polish=polish)

@@ -46,3 +46,31 @@ export async function fetchDeadlines(days = 14, scope: "saved" | "all" = "saved"
 
 /** Download the .ics file (the browser sends the session cookie, so a plain link works). */
 export const CALENDAR_URL = "/api/backend/api/bookmarks/calendar.ics";
+
+export interface StandupAction {
+    kind: string;
+    text: string;
+    priority: number;
+    item_id: number | null;
+}
+
+export interface Standup {
+    facts: {
+        saved: number;
+        applied: number;
+        interview: number;
+        offer: number;
+        rejected: number;
+        closing_soon: string[];
+        stale_applications: number;
+        has_profile: boolean;
+        has_active_mission: boolean;
+    };
+    actions: StandupAction[];
+    text: string;
+}
+
+export async function fetchStandup(polish = false): Promise<Standup> {
+    const { data } = await api.get<Standup>("/api/standup", { params: { polish } });
+    return data;
+}

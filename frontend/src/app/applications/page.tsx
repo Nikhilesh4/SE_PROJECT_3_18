@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import PageShell, { ErrorNote, Spinner } from "@/app/components/PageShell";
+import StandupCard from "./StandupCard";
 import { errorMessage } from "@/lib/errors";
 import {
     CALENDAR_URL,
@@ -176,6 +177,8 @@ export default function ApplicationsPage() {
             }
         >
             <ErrorNote message={error} />
+
+            <StandupCard />
 
             {deadlines.length > 0 && (
                 <section aria-label="Closing soon" className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">

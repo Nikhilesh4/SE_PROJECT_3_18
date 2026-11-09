@@ -120,3 +120,55 @@ def test_digest_summarises_tracker_and_is_sent_once_per_week(client, with_profil
     finally:
         db.close()
     assert client.get("/api/notifications", headers=with_profile).json()["notifications"][0]["kind"] == "digest"
+
+
+def _track(client, headers, item, status=None):
+    client.post(f"/api/bookmarks/{item.id}", headers=headers)
+    if status:
+        client.patch(f"/api/applications/{item.id}", headers=headers, json={"status": status})
+
+
+def test_standup_endpoint_ranks_actions_and_caps_at_three(client, with_profile, seed_items):
+    deadline, interview, applied = seed_items(
+        make_item(url="https://e.com/d", title="Closing Role", application_deadline=NOW + timedelta(days=2)),
+        make_item(url="https://e.com/i", title="Interview Role"),
+        make_item(url="https://e.com/a", title="Applied Role"),
+    )
+    _track(client, with_profile, deadline)
+    _track(client, with_profile, interview, "interview")
+    _track(client, with_profile, applied, "applied")
+    db = SessionLocal()
+    try:
+        from app.models.bookmark import Bookmark
+        db.query(Bookmark).filter(Bookmark.rss_item_id == applied.id).update({Bookmark.updated_at: NOW - timedelta(days=30)})
+        db.commit()
+    finally:
+        db.close()
+
+    data = client.get("/api/standup", headers=with_profile).json()
+    kinds = [a["kind"] for a in data["actions"]]
+    assert kinds == ["deadline", "interview", "follow_up"]  # priority order, capped at 3
+    assert data["actions"][0]["item_id"] == deadline.id and "Closing Role" in data["actions"][0]["text"]
+    assert data["facts"]["saved"] == 1 and data["facts"]["interview"] == 1 and data["facts"]["stale_applications"] == 1
+    assert "Closing Role" in data["text"]
+
+
+def test_standup_asks_for_a_resume_first_when_there_is_no_profile(client, auth_headers):
+    data = client.get("/api/standup", headers=auth_headers).json()
+    assert data["actions"][0]["kind"] == "profile" and data["facts"]["has_profile"] is False
+
+
+def test_standup_surfaces_a_recurring_skill_gap(client, with_profile, seed_items):
+    a, b = seed_items(
+        make_item(url="https://e.com/k1", title="Platform Intern", summary="Kubernetes and Docker experience required."),
+        make_item(url="https://e.com/k2", title="DevOps Intern", summary="You will use Kubernetes daily."),
+    )
+    _track(client, with_profile, a)
+    _track(client, with_profile, b)
+    acts = client.get("/api/standup", headers=with_profile).json()["actions"]
+    gap = [x for x in acts if x["kind"] == "skill_gap"]
+    assert gap and "kubernetes" in gap[0]["text"].lower() and "2 of your 2" in gap[0]["text"]
+
+
+def test_standup_requires_login(client):
+    assert client.get("/api/standup").status_code == 401
