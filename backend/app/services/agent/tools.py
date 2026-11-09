@@ -21,10 +21,10 @@ from mcp import Client
 from unicompass_mcp.api import Credentials, UniCompassAPI
 from unicompass_mcp.server import create_server
 
+from app.config import settings
 from app.services.agent.mcp_clients import ExternalTools
 from app.services.agent.providers import ToolCall, ToolOutcome, ToolSpec
 
-MAX_RESULT_CHARS = 12_000
 
 
 class Toolbox:
@@ -73,8 +73,8 @@ class Toolbox:
                 text, is_error = await self._external.call(call.name, call.arguments)
             except Exception as exc:  # noqa: BLE001 — surfaced to the model as a tool error
                 return ToolOutcome(call, f"{call.name} failed: {exc.__class__.__name__}", is_error=True)
-            if len(text) > MAX_RESULT_CHARS:
-                text = text[:MAX_RESULT_CHARS] + " …[truncated]"
+            if len(text) > settings.AGENT_TOOL_RESULT_CHARS:
+                text = text[:settings.AGENT_TOOL_RESULT_CHARS] + " …[truncated]"
             return ToolOutcome(call, text, is_error=is_error)
         result = await self._client.call_tool(call.name, call.arguments)
         if result.is_error:
@@ -88,6 +88,6 @@ class Toolbox:
             text = json.dumps(data, ensure_ascii=False, default=str)
         else:
             text = " ".join(getattr(c, "text", "") for c in result.content)
-        if len(text) > MAX_RESULT_CHARS:
-            text = text[:MAX_RESULT_CHARS] + " …[truncated — narrow the query or lower `limit`]"
+        if len(text) > settings.AGENT_TOOL_RESULT_CHARS:
+            text = text[:settings.AGENT_TOOL_RESULT_CHARS] + " …[truncated — narrow the query or lower `limit`]"
         return ToolOutcome(call, text)

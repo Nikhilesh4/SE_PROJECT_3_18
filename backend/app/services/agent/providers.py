@@ -11,8 +11,10 @@ opaque dicts and only asks the provider to build, stream and inspect them.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
@@ -214,6 +216,8 @@ class GroqProvider(LLMProvider):
 
     name = "groq"
     URL = "https://api.groq.com/openai/v1/chat/completions"
+    MAX_RATE_LIMIT_RETRIES = 6
+    MAX_RETRY_WAIT = 60.0  # seconds; Groq free tier is only 8k tokens/minute, one agent round is ~5k
 
     def __init__(self, model: str | None = None, *, transport: httpx.AsyncBaseTransport | None = None) -> None:
         self.model = model or settings.GROQ_MODEL
@@ -227,9 +231,11 @@ class GroqProvider(LLMProvider):
             "model": self.model,
             "messages": [{"role": "system", "content": system}, *history],
             "temperature": 0.3,
-            "max_tokens": 4096,
+            "max_tokens": settings.GROQ_MAX_OUTPUT_TOKENS,  # Groq counts this against tokens/minute
             "stream": True,
         }
+        if self.model.startswith("openai/gpt-oss"):
+            body["reasoning_effort"] = "low"  # reasoning tokens also count against the limit
         if tools:  # the API rejects tool_choice without tools (plain completions, e.g. RAG answers)
             body["tools"] = [
                 {
@@ -243,37 +249,46 @@ class GroqProvider(LLMProvider):
         calls: dict[int, dict[str, str]] = {}
         finish = None
 
-        try:
-            async with httpx.AsyncClient(timeout=60.0, transport=self._transport) as client:
-                async with client.stream(
-                    "POST",
-                    self.URL,
-                    json=body,
-                    headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
-                ) as resp:
-                    if resp.status_code >= 400:
-                        detail = (await resp.aread()).decode(errors="replace")[:300]
-                        raise ProviderError(_groq_error(resp.status_code, detail))
-                    async for line in resp.aiter_lines():
-                        if not line.startswith("data: "):
-                            continue
-                        data = line[6:].strip()
-                        if data == "[DONE]":
-                            break
-                        choice = json.loads(data)["choices"][0]
-                        delta = choice.get("delta", {})
-                        if delta.get("content"):
-                            text_parts.append(delta["content"])
-                            await on_text(delta["content"])
-                        for tc in delta.get("tool_calls") or []:
-                            slot = calls.setdefault(tc["index"], {"id": "", "name": "", "arguments": ""})
-                            slot["id"] = tc.get("id") or slot["id"]
-                            fn = tc.get("function") or {}
-                            slot["name"] += fn.get("name") or ""
-                            slot["arguments"] += fn.get("arguments") or ""
-                        finish = choice.get("finish_reason") or finish
-        except httpx.HTTPError as exc:
-            raise ProviderError("Could not reach the Groq API.") from exc
+        for attempt in range(self.MAX_RATE_LIMIT_RETRIES + 1):
+            text_parts.clear()
+            calls.clear()
+            finish = None
+            try:
+                async with httpx.AsyncClient(timeout=60.0, transport=self._transport) as client:
+                    async with client.stream(
+                        "POST",
+                        self.URL,
+                        json=body,
+                        headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
+                    ) as resp:
+                        if resp.status_code >= 400:
+                            detail = (await resp.aread()).decode(errors="replace")[:300]
+                            wait = _retry_after(resp.headers.get("retry-after"), detail)
+                            if resp.status_code == 429 and attempt < self.MAX_RATE_LIMIT_RETRIES and wait <= self.MAX_RETRY_WAIT:
+                                await asyncio.sleep(wait)  # nothing streamed yet, so a retry is safe
+                                continue
+                            raise ProviderError(_groq_error(resp.status_code, detail))
+                        async for line in resp.aiter_lines():
+                            if not line.startswith("data: "):
+                                continue
+                            data = line[6:].strip()
+                            if data == "[DONE]":
+                                break
+                            choice = json.loads(data)["choices"][0]
+                            delta = choice.get("delta", {})
+                            if delta.get("content"):
+                                text_parts.append(delta["content"])
+                                await on_text(delta["content"])
+                            for tc in delta.get("tool_calls") or []:
+                                slot = calls.setdefault(tc["index"], {"id": "", "name": "", "arguments": ""})
+                                slot["id"] = tc.get("id") or slot["id"]
+                                fn = tc.get("function") or {}
+                                slot["name"] += fn.get("name") or ""
+                                slot["arguments"] += fn.get("arguments") or ""
+                            finish = choice.get("finish_reason") or finish
+                break
+            except httpx.HTTPError as exc:
+                raise ProviderError("Could not reach the Groq API.") from exc
 
         tool_calls = []
         for slot in (calls[i] for i in sorted(calls)):
@@ -311,6 +326,19 @@ class GroqProvider(LLMProvider):
             for c in message.get("tool_calls") or []
         ]
         return {"role": message["role"], "text": message.get("content") or "", "tool_calls": calls}
+
+
+def _retry_after(header: str | None, detail: str) -> float:
+    """Seconds to wait after a 429: the Retry-After header, else Groq's 'try again in 1.5s' text."""
+    try:
+        if header:
+            return max(0.5, float(header)) + 0.25
+    except ValueError:
+        pass
+    m = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", detail)
+    if m:
+        return int(m.group(1) or 0) * 60 + float(m.group(2)) + 0.25
+    return 5.0
 
 
 def _groq_error(status: int, detail: str) -> str:

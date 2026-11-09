@@ -83,7 +83,7 @@ class Settings(BaseSettings):
 
     # Groq API
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
     # Anthropic API (Compass Agent with AGENT_PROVIDER=anthropic). When empty,
     # the SDK falls back to ANTHROPIC_AUTH_TOKEN or an `ant auth login` profile.
@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     # Compass Agent (in-app assistant)
     AGENT_PROVIDER: str = os.getenv("AGENT_PROVIDER", "groq")  # "groq" | "anthropic"
     AGENT_MODEL: str = os.getenv("AGENT_MODEL", "")  # empty → provider default
+    # Cap on one tool result fed back to the model. Groq's free tier allows only 8k tokens/minute and the
+    # whole conversation is re-sent every round, so keep this small there; raise it for Claude.
+    GROQ_MAX_OUTPUT_TOKENS: int = int(os.getenv("GROQ_MAX_OUTPUT_TOKENS", "1500"))
+    AGENT_TOOL_RESULT_CHARS: int = int(os.getenv("AGENT_TOOL_RESULT_CHARS", "5000"))
     # JSON file listing external MCP servers the agent may use (see services/agent/mcp_clients.py); empty = bundled default
     MCP_CLIENTS_PATH: str = os.getenv("MCP_CLIENTS_PATH", "")
     AGENT_MAX_TOOL_ROUNDS: int = 8

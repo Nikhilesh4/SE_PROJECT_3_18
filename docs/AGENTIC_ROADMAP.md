@@ -308,6 +308,9 @@ GROQ_API_KEY=...
 AGENT_PROVIDER=groq                 # or anthropic
 ANTHROPIC_API_KEY=...               # when AGENT_PROVIDER=anthropic (model claude-opus-5-5)
 # AGENT_MODEL=                      # optional override
+# GROQ_MODEL=openai/gpt-oss-120b    # default; llama-3.3-70b-versatile is no longer served by Groq
+# GROQ_MAX_OUTPUT_TOKENS=1500       # Groq counts max_tokens against its 8k tokens/minute free-tier limit
+# AGENT_TOOL_RESULT_CHARS=5000      # cap per tool result fed back to the model
 
 # Semantic matching (defaults shown)
 EMBEDDINGS_ENABLED=true
@@ -365,8 +368,23 @@ cd ../mcp-server && .venv/bin/pytest
 
 **Not built**
 - Reddit/Discord/Telegram watchers, funding-news "hidden market" scout, GitHub "good first issue" discovery.
-- Dedicated Ingestion QA agent (the content filter still passes some blog posts as hackathons).
+- Ingestion QA exists in the discovery pipeline (checked 500, flagged 6 in the live run), but the `hackathon` category in the dev DB still holds blog posts and RSS-Bridge error items, so its coverage is limited.
 - Langfuse/external tracing (an `agent_runs` table exists), weekly career-standup agent, aggregate stipend insights.
 - Peer features (sharing, hackathon teams, campus feeds), autofill extension, GraphRAG, Researcher-Tailor-Writer-Reviewer pipeline.
 
 **Loose ends from section 6 not re-verified:** RemoteOK 410 sources, HTML entities in feed cards, "from 0 sources" header, `google.generativeai` deprecation, empty chat after a failed first message, demo account in the dev DB.
+
+### Real-LLM validation, 2026-11-09 (Groq, `openai/gpt-oss-120b`)
+
+Run against the dev DB (2,174 postings, 8,227 RAG passages) with a real Groq key.
+
+| Check | Result |
+|---|---|
+| Ask this posting (5 questions, 3 postings) | Accurate and grounded; correct "Not stated" |
+| Assistant tool loop (search, get, find_in_posting) | Works; answered with 2 real ML internships |
+| Mission query parsing, interview questions and feedback, outreach draft | Work |
+| Discovery live run (ATS Lever/Greenhouse/Ashby, HN, Devpost) | 201 postings upserted; HN LLM extraction gave clean titles and companies |
+
+Bugs found and fixed: the default Groq model had been retired (404 on every call); `gpt-oss` cites as 【n】 and the citation parser missed it; no retry on 429; Groq's 8k tokens/minute limit counts `max_tokens` and about 3.5k tokens of tool definitions per round (now bounded: smaller `max_tokens`, `reasoning_effort=low`, 5,000-char tool results, up to 6 retries honoring `retry-after`); the assistant said "found nothing" when only the deadline was missing (prompt fixed).
+
+Still unverified: Anthropic provider, web search (no Tavily/Brave key), external MCP servers, the Gmail inbox agent. Free-tier Groq makes an agent turn slow (about 2 minutes for 5 tool rounds); a paid tier or Claude removes that.

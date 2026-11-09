@@ -332,3 +332,41 @@ def test_anthropic_message_shapes():
     assert provider.visible(assistant) == {
         "role": "assistant", "text": "Checking.", "tool_calls": [{"name": "get_profile", "arguments": {}}],
     }
+
+
+@pytest.mark.anyio
+async def test_groq_retries_after_rate_limit(monkeypatch):
+    monkeypatch.setattr(providers.settings, "GROQ_API_KEY", "test-key")
+    sleeps = []
+
+    async def fake_sleep(s):
+        sleeps.append(s)
+
+    monkeypatch.setattr(providers.asyncio, "sleep", fake_sleep)
+    ok = 'data: {"choices":[{"delta":{"content":"hello"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            return httpx.Response(429, json={"error": "slow"}, headers={"retry-after": "2"})
+        return httpx.Response(200, content=ok, headers={"content-type": "text/event-stream"})
+
+    async def noop(_):
+        pass
+
+    provider = GroqProvider(transport=httpx.MockTransport(handler))
+    turn = await provider.stream_turn(system="s", history=[], tools=[], on_text=noop)
+    assert turn.text == "hello" and calls["n"] == 3 and sleeps == [2.25, 2.25]
+
+
+@pytest.mark.anyio
+async def test_groq_gives_up_when_rate_limit_wait_is_long(monkeypatch):
+    monkeypatch.setattr(providers.settings, "GROQ_API_KEY", "test-key")
+    provider = GroqProvider(transport=httpx.MockTransport(lambda r: httpx.Response(429, json={}, headers={"retry-after": "120"})))
+
+    async def noop(_):
+        pass
+
+    with pytest.raises(ProviderError, match="rate-limiting"):
+        await provider.stream_turn(system="s", history=[], tools=[], on_text=noop)

@@ -66,7 +66,7 @@ async def answer_question(provider: LLMProvider, item_id: int, question: str) ->
         tools=[],
         on_text=ignore,
     )
-    text = turn.text.strip()
+    text = normalize_answer_text(turn.text)
     if turn.stop == "refusal" or not text:
         raise ProviderError("The model could not answer this question; try rephrasing it.")
 
@@ -78,6 +78,18 @@ async def answer_question(provider: LLMProvider, item_id: int, question: str) ->
         citations=cited,
         passages=numbered,
     )
+
+
+_GROUP_RE = re.compile(r"[\[【]\s*(\d+(?:\s*[,;]\s*\d+)+)\s*[\]】]")
+
+
+def normalize_answer_text(text: str) -> str:
+    """Make provider quirks uniform: some models (e.g. gpt-oss) cite as 【2】 or [1, 2]
+    and use narrow no-break spaces and non-breaking hyphens."""
+    text = (text or "").strip()
+    text = text.replace(" ", " ").replace("‑", "-").replace(" ", " ")
+    text = _GROUP_RE.sub(lambda m: "".join(f"[{n}]" for n in re.split(r"\s*[,;]\s*", m.group(1))), text)
+    return re.sub(r"【\s*(\d+)\s*】", r"[\1]", text)
 
 
 def _details_passage(p: Passage) -> dict:

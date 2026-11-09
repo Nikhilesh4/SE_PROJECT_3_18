@@ -270,3 +270,11 @@ def test_cross_posting_search_needs_every_term_in_one_passage(client, postings, 
     # Within one posting any term counts, since the posting is already chosen.
     body = client.get(f"/api/rag/items/{frontend.id}/passages", params={"q": "remote stipend"}).json()
     assert body["passages"][0]["match"] == "keyword" and "remote" in body["passages"][0]["text"]
+
+
+def test_normalize_answer_text_handles_model_citation_styles():
+    from app.services.rag.answer import normalize_answer_text
+
+    assert normalize_answer_text("Prize  $6,000【52】.") == "Prize  $6,000[52]."
+    assert normalize_answer_text("Remote [1, 2] and paid【 3 】") == "Remote [1][2] and paid[3]"
+    assert normalize_answer_text("Not stated in this posting. [2]") == "Not stated in this posting. [2]"

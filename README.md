@@ -453,6 +453,9 @@ GOOGLE_API_KEY=your-google-ai-api-key
 # ── Compass Assistant ────────────────────────────────────
 AGENT_PROVIDER=groq                 # or "anthropic"
 GROQ_API_KEY=your-groq-key          # used for groq (also used by resume parsing)
+GROQ_MODEL=openai/gpt-oss-120b         # default; the old llama-3.3-70b-versatile default was retired by Groq
+GROQ_MAX_OUTPUT_TOKENS=1500          # Groq counts this against its 8k tokens/minute free-tier limit
+AGENT_TOOL_RESULT_CHARS=5000         # cap per tool result fed back to the assistant
 ANTHROPIC_API_KEY=your-anthropic-key  # used for anthropic (default model claude-opus-5-5)
 # AGENT_MODEL=                      # optional model override for the chosen provider
 
